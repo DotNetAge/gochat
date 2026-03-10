@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DotNetAge/gochat/pkg/client/base"
 	"github.com/DotNetAge/gochat/pkg/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,32 +24,40 @@ func TestNew(t *testing.T) {
 	}{{
 		name: "valid config",
 		config: Config{
-			APIKey:      "test-key",
-			Model:       "claude-3-opus-20240229",
-			Timeout:     30 * time.Second,
-			MaxRetries:  3,
-			Temperature: 0.7,
-			MaxTokens:   1000,
+			Config: base.Config{
+				APIKey:      "test-key",
+				Model:       "claude-3-opus-20240229",
+				Timeout:     30 * time.Second,
+				MaxRetries:  3,
+				Temperature: 0.7,
+				MaxTokens:   1000,
+			},
 		},
 		wantErr: false,
 	}, {
 		name: "empty api key",
 		config: Config{
-			APIKey: "",
-			Model:  "claude-3-opus-20240229",
+			Config: base.Config{
+				APIKey: "",
+				Model:  "claude-3-opus-20240229",
+			},
 		},
 		wantErr: true,
 	}, {
 		name: "invalid model",
 		config: Config{
-			APIKey: "test-key",
-			Model:  "invalid-model",
+			Config: base.Config{
+				APIKey: "test-key",
+				Model:  "invalid-model",
+			},
 		},
 		wantErr: false,
 	}, {
 		name: "default values",
 		config: Config{
-			APIKey: "test-key",
+			Config: base.Config{
+				APIKey: "test-key",
+			},
 		},
 		wantErr: false,
 	}}
@@ -64,19 +73,19 @@ func TestNew(t *testing.T) {
 				assert.NotNil(t, client)
 				// Verify default values are set
 				if tt.config.Model == "" {
-					assert.Equal(t, "claude-3-opus-20240229", client.config.Model)
+					assert.Equal(t, "claude-3-opus-20240229", client.base.Config().Model)
 				}
 				if tt.config.BaseURL == "" {
-					assert.Equal(t, "https://api.anthropic.com", client.config.BaseURL)
+					assert.Equal(t, "https://api.anthropic.com", client.base.Config().BaseURL)
 				}
 				if tt.config.Timeout == 0 {
-					assert.Equal(t, 30*time.Second, client.config.Timeout)
+					assert.Equal(t, 30*time.Second, client.base.Config().Timeout)
 				}
 				if tt.config.MaxRetries == 0 {
-					assert.Equal(t, 3, client.config.MaxRetries)
+					assert.Equal(t, 3, client.base.Config().MaxRetries)
 				}
 				if tt.config.Temperature == 0 {
-					assert.Equal(t, 0.7, client.config.Temperature)
+					assert.Equal(t, 0.7, client.base.Config().Temperature)
 				}
 			}
 		})
@@ -125,9 +134,11 @@ func TestClient_Complete(t *testing.T) {
 	defer server.Close()
 
 	client, err := New(Config{
-		APIKey:  "test-key",
-		Model:   "claude-3-opus-20240229",
-		BaseURL: server.URL,
+		Config: base.Config{
+			APIKey:  "test-key",
+			Model:   "claude-3-opus-20240229",
+			BaseURL: server.URL,
+		},
 	})
 	require.NoError(t, err)
 
@@ -164,9 +175,11 @@ func TestClient_CompleteStream(t *testing.T) {
 	defer server.Close()
 
 	client, err := New(Config{
-		APIKey:  "test-key",
-		Model:   "claude-3-opus-20240229",
-		BaseURL: server.URL,
+		Config: base.Config{
+			APIKey:  "test-key",
+			Model:   "claude-3-opus-20240229",
+			BaseURL: server.URL,
+		},
 	})
 	require.NoError(t, err)
 
@@ -213,10 +226,12 @@ func TestClient_Complete_ErrorHandling(t *testing.T) {
 			defer server.Close()
 
 			client, err := New(Config{
-				APIKey:     "test-key",
-				Model:      "claude-3-opus-20240229",
-				BaseURL:    server.URL,
-				MaxRetries: 0,
+				Config: base.Config{
+					APIKey:     "test-key",
+					Model:      "claude-3-opus-20240229",
+					BaseURL:    server.URL,
+					MaxRetries: 0,
+				},
 			})
 			require.NoError(t, err)
 
@@ -234,11 +249,13 @@ func TestClient_Complete_Timeout(t *testing.T) {
 	defer server.Close()
 
 	client, err := New(Config{
-		APIKey:     "test-key",
-		Model:      "claude-3-opus-20240229",
-		BaseURL:    server.URL,
-		Timeout:    100 * time.Millisecond,
-		MaxRetries: 0,
+		Config: base.Config{
+			APIKey:     "test-key",
+			Model:      "claude-3-opus-20240229",
+			BaseURL:    server.URL,
+			Timeout:    100 * time.Millisecond,
+			MaxRetries: 0,
+		},
 	})
 	require.NoError(t, err)
 
@@ -270,9 +287,11 @@ func TestClient_Complete_EmptyPrompt(t *testing.T) {
 	defer server.Close()
 
 	client, err := New(Config{
-		APIKey:  "test-key",
-		Model:   "claude-3-opus-20240229",
-		BaseURL: server.URL,
+		Config: base.Config{
+			APIKey:  "test-key",
+			Model:   "claude-3-opus-20240229",
+			BaseURL: server.URL,
+		},
 	})
 	require.NoError(t, err)
 
@@ -292,9 +311,11 @@ func TestClient_CompleteStream_ErrorInStream(t *testing.T) {
 	defer server.Close()
 
 	client, err := New(Config{
-		APIKey:  "test-key",
-		Model:   "claude-3-opus-20240229",
-		BaseURL: server.URL,
+		Config: base.Config{
+			APIKey:  "test-key",
+			Model:   "claude-3-opus-20240229",
+			BaseURL: server.URL,
+		},
 	})
 	require.NoError(t, err)
 

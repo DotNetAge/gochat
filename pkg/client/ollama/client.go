@@ -10,28 +10,27 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/DotNetAge/gochat/pkg/client/base"
 	"github.com/DotNetAge/gochat/pkg/core"
 )
 
+// Config configures the Ollama client
 type Config struct {
-	Model       string
-	BaseURL     string
-	Timeout     time.Duration
-	MaxRetries  int
-	Temperature float64
-	MaxTokens   int
+	base.Config
 }
 
+// Client implements an LLM client for Ollama
 type Client struct {
-	config     Config
-	httpClient *http.Client
+	base *base.Client
 }
 
+// Message represents a message in the conversation
 type Message struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }
 
+// ChatCompletionRequest represents a chat completion request
 type ChatCompletionRequest struct {
 	Model       string    `json:"model"`
 	Messages    []Message `json:"messages"`
@@ -40,12 +39,14 @@ type ChatCompletionRequest struct {
 	Stream      bool      `json:"stream,omitempty"`
 }
 
+// Choice represents a choice in the chat completion response
 type Choice struct {
 	Index        int     `json:"index"`
 	Message      Message `json:"message"`
 	FinishReason string  `json:"finish_reason"`
 }
 
+// ChatCompletionResponse represents a chat completion response
 type ChatCompletionResponse struct {
 	Model              string  `json:"model"`
 	CreatedAt          string  `json:"created_at"`
@@ -60,22 +61,26 @@ type ChatCompletionResponse struct {
 	EvalDuration       int64   `json:"eval_duration"`
 }
 
+// Usage represents usage information
 type Usage struct {
 	PromptTokens     int `json:"prompt_tokens"`
 	CompletionTokens int `json:"completion_tokens"`
 	TotalTokens      int `json:"total_tokens"`
 }
 
+// Delta represents a delta in the streaming response
 type Delta struct {
 	Content string `json:"content,omitempty"`
 }
 
+// StreamChoice represents a choice in the streaming response
 type StreamChoice struct {
 	Index        int    `json:"index"`
 	Delta        *Delta `json:"delta,omitempty"`
 	FinishReason string `json:"finish_reason,omitempty"`
 }
 
+// StreamChunk represents a chunk in the streaming response
 type StreamChunk struct {
 	Model              string   `json:"model"`
 	CreatedAt          string   `json:"created_at"`
@@ -91,10 +96,12 @@ type StreamChunk struct {
 	EvalDuration       int64    `json:"eval_duration,omitempty"`
 }
 
+// ErrorResponse represents an error response
 type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
+// New creates a new Ollama client
 func New(config Config) (*Client, error) {
 	if config.Model == "" {
 		config.Model = "llama2"
@@ -108,78 +115,64 @@ func New(config Config) (*Client, error) {
 		config.Timeout = 60 * time.Second
 	}
 
-	if config.MaxRetries == 0 {
-		config.MaxRetries = 3
-	}
-
-	if config.Temperature == 0 {
-		config.Temperature = 0.7
-	}
+	baseClient := base.New(config.Config)
 
 	return &Client{
-		config: config,
-		httpClient: &http.Client{
-			Timeout: config.Timeout,
-		},
+		base: baseClient,
 	}, nil
 }
 
+// Complete performs a non-streaming completion
 func (c *Client) Complete(ctx context.Context, prompt string) (string, error) {
-	var lastErr error
+	var response *ChatCompletionResponse
 
-	for attempt := 0; attempt <= c.config.MaxRetries; attempt++ {
-		if attempt > 0 {
-			select {
-			case <-ctx.Done():
-				return "", ctx.Err()
-			case <-time.After(time.Duration(attempt) * time.Second):
-			}
+	err := c.base.Retry(ctx, func() error {
+		resp, err := c.doComplete(ctx, prompt, false)
+		if err != nil {
+			return err
 		}
+		response = resp
+		return nil
+	})
 
-		response, err := c.doComplete(ctx, prompt, false)
-		if err == nil {
-			return response.Message.Content, nil
-		}
-
-		lastErr = err
-		if !core.IsRetryableError(err) {
-			break
-		}
+	if err != nil {
+		return "", err
 	}
 
-	return "", lastErr
+	return response.Message.Content, nil
 }
 
+// CompleteStream performs a streaming completion
 func (c *Client) CompleteStream(ctx context.Context, prompt string) (<-chan string, error) {
 	reqBody := ChatCompletionRequest{
-		Model: c.config.Model,
+		Model: c.base.Config().Model,
 		Messages: []Message{
 			{
 				Role:    "user",
 				Content: prompt,
 			},
 		},
-		Temperature: c.config.Temperature,
-		MaxTokens:   c.config.MaxTokens,
+		Temperature: c.base.Config().Temperature,
+		MaxTokens:   c.base.Config().MaxTokens,
 		Stream:      true,
 	}
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, core.NewValidationError("failed to marshal request", err)
 	}
 
-	url := fmt.Sprintf("%s/api/chat", c.config.BaseURL)
+	url := fmt.Sprintf("%s/api/chat", c.base.Config().BaseURL)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, core.NewNetworkError("failed to create request", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.base.HTTPClient().Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
+		return nil, core.NewNetworkError("failed to send request", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -187,15 +180,15 @@ func (c *Client) CompleteStream(ctx context.Context, prompt string) (<-chan stri
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read response: %w", err)
+			return nil, core.NewNetworkError("failed to read response", err)
 		}
 
 		var errResp ErrorResponse
 		if err := json.Unmarshal(body, &errResp); err == nil {
-			return nil, fmt.Errorf("error: %s", errResp.Error)
+			return nil, core.NewAPIError(fmt.Sprintf("error: %s", errResp.Error), nil)
 		}
 
-		return nil, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
+		return nil, core.NewAPIError(fmt.Sprintf("request failed with status %d: %s", resp.StatusCode, string(body)), nil)
 	}
 
 	ch := make(chan string, 10)
@@ -252,36 +245,37 @@ func (c *Client) CompleteStream(ctx context.Context, prompt string) (<-chan stri
 	return ch, nil
 }
 
+// doComplete performs a completion request
 func (c *Client) doComplete(ctx context.Context, prompt string, stream bool) (*ChatCompletionResponse, error) {
 	reqBody := ChatCompletionRequest{
-		Model: c.config.Model,
+		Model: c.base.Config().Model,
 		Messages: []Message{
 			{
 				Role:    "user",
 				Content: prompt,
 			},
 		},
-		Temperature: c.config.Temperature,
-		MaxTokens:   c.config.MaxTokens,
+		Temperature: c.base.Config().Temperature,
+		MaxTokens:   c.base.Config().MaxTokens,
 		Stream:      stream,
 	}
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+		return nil, core.NewValidationError("failed to marshal request", err)
 	}
 
-	url := fmt.Sprintf("%s/api/chat", c.config.BaseURL)
+	url := fmt.Sprintf("%s/api/chat", c.base.Config().BaseURL)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, core.NewNetworkError("failed to create request", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.base.HTTPClient().Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to send request: %w", err)
+		return nil, core.NewNetworkError("failed to send request", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -289,15 +283,15 @@ func (c *Client) doComplete(ctx context.Context, prompt string, stream bool) (*C
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read response: %w", err)
+			return nil, core.NewNetworkError("failed to read response", err)
 		}
 
 		var errResp ErrorResponse
 		if err := json.Unmarshal(body, &errResp); err == nil {
-			return nil, fmt.Errorf("error: %s", errResp.Error)
+			return nil, core.NewAPIError(fmt.Sprintf("error: %s", errResp.Error), nil)
 		}
 
-		return nil, fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(body))
+		return nil, core.NewAPIError(fmt.Sprintf("request failed with status %d: %s", resp.StatusCode, string(body)), nil)
 	}
 
 	defer resp.Body.Close()
@@ -315,7 +309,7 @@ func (c *Client) doComplete(ctx context.Context, prompt string, stream bool) (*C
 
 		var chunk StreamChunk
 		if err := json.Unmarshal([]byte(line), &chunk); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal chunk: %w", err)
+			return nil, core.NewValidationError("failed to unmarshal chunk", err)
 		}
 
 		lastChunk = chunk
@@ -328,7 +322,7 @@ func (c *Client) doComplete(ctx context.Context, prompt string, stream bool) (*C
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("failed to read response: %w", err)
+		return nil, core.NewNetworkError("failed to read response", err)
 	}
 
 	// Create final response

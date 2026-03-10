@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DotNetAge/gochat/pkg/client/base"
 	"github.com/DotNetAge/gochat/pkg/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,28 +25,34 @@ func TestNewClient(t *testing.T) {
 		{
 			name: "valid config",
 			config: Config{
-				APIKey:      "test-key",
-				Model:       "gpt-3.5-turbo",
-				Timeout:     30 * time.Second,
-				MaxRetries:  3,
-				Temperature: 0.7,
-				MaxTokens:   1000,
+				Config: base.Config{
+					APIKey:      "test-key",
+					Model:       "gpt-3.5-turbo",
+					Timeout:     30 * time.Second,
+					MaxRetries:  3,
+					Temperature: 0.7,
+					MaxTokens:   1000,
+				},
 			},
 			wantErr: false,
 		},
 		{
 			name: "empty api key",
 			config: Config{
-				APIKey: "",
-				Model:  "gpt-3.5-turbo",
+				Config: base.Config{
+					APIKey: "",
+					Model:  "gpt-3.5-turbo",
+				},
 			},
 			wantErr: true,
 		},
 		{
 			name: "invalid model",
 			config: Config{
-				APIKey: "test-key",
-				Model:  "invalid-model",
+				Config: base.Config{
+					APIKey: "test-key",
+					Model:  "invalid-model",
+				},
 			},
 			wantErr: false,
 		},
@@ -108,9 +115,11 @@ func TestClient_Complete(t *testing.T) {
 	defer server.Close()
 
 	client, err := New(Config{
-		APIKey:  "test-key",
-		Model:   "gpt-3.5-turbo",
-		BaseURL: server.URL,
+		Config: base.Config{
+			APIKey:  "test-key",
+			Model:   "gpt-3.5-turbo",
+			BaseURL: server.URL,
+		},
 	})
 	require.NoError(t, err)
 
@@ -147,9 +156,11 @@ func TestClient_CompleteStream(t *testing.T) {
 	defer server.Close()
 
 	client, err := New(Config{
-		APIKey:  "test-key",
-		Model:   "gpt-3.5-turbo",
-		BaseURL: server.URL,
+		Config: base.Config{
+			APIKey:  "test-key",
+			Model:   "gpt-3.5-turbo",
+			BaseURL: server.URL,
+		},
 	})
 	require.NoError(t, err)
 
@@ -200,10 +211,12 @@ func TestClient_Complete_ErrorHandling(t *testing.T) {
 			defer server.Close()
 
 			client, err := New(Config{
-				APIKey:     "test-key",
-				Model:      "gpt-3.5-turbo",
-				BaseURL:    server.URL,
-				MaxRetries: 0,
+				Config: base.Config{
+					APIKey:     "test-key",
+					Model:      "gpt-3.5-turbo",
+					BaseURL:    server.URL,
+					MaxRetries: 0,
+				},
 			})
 			require.NoError(t, err)
 
@@ -221,11 +234,13 @@ func TestClient_Complete_Timeout(t *testing.T) {
 	defer server.Close()
 
 	client, err := New(Config{
-		APIKey:     "test-key",
-		Model:      "gpt-3.5-turbo",
-		BaseURL:    server.URL,
-		Timeout:    100 * time.Millisecond,
-		MaxRetries: 0,
+		Config: base.Config{
+			APIKey:     "test-key",
+			Model:      "gpt-3.5-turbo",
+			BaseURL:    server.URL,
+			Timeout:    100 * time.Millisecond,
+			MaxRetries: 0,
+		},
 	})
 	require.NoError(t, err)
 
@@ -259,9 +274,11 @@ func TestClient_Complete_EmptyPrompt(t *testing.T) {
 	defer server.Close()
 
 	client, err := New(Config{
-		APIKey:  "test-key",
-		Model:   "gpt-3.5-turbo",
-		BaseURL: server.URL,
+		Config: base.Config{
+			APIKey:  "test-key",
+			Model:   "gpt-3.5-turbo",
+			BaseURL: server.URL,
+		},
 	})
 	require.NoError(t, err)
 
@@ -281,9 +298,11 @@ func TestClient_CompleteStream_ErrorInStream(t *testing.T) {
 	defer server.Close()
 
 	client, err := New(Config{
-		APIKey:  "test-key",
-		Model:   "gpt-3.5-turbo",
-		BaseURL: server.URL,
+		Config: base.Config{
+			APIKey:  "test-key",
+			Model:   "gpt-3.5-turbo",
+			BaseURL: server.URL,
+		},
 	})
 	require.NoError(t, err)
 

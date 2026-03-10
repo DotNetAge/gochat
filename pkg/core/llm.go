@@ -61,8 +61,18 @@ type Client interface {
 //	    Temperature: 0.7,
 //	    MaxTokens:   1000,
 //	}
+//
+// Alternative using AuthToken:
+//
+//	config := Config{
+//	    AuthToken:   "your-auth-token",
+//	    Model:       "gpt-4",
+//	    Temperature: 0.7,
+//	    MaxTokens:   1000,
+//	}
 type Config struct {
 	APIKey      string  // API key for the LLM provider
+	AuthToken   string  // Auth token for the LLM provider (alternative to APIKey)
 	Model       string  // Model name to use
 	BaseURL     string  // Base URL for API requests (optional)
 	Temperature float64 // Temperature for generation (0.0-1.0)
