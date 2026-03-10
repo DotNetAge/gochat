@@ -14,91 +14,61 @@ import (
 	"github.com/DotNetAge/gochat/pkg/core"
 )
 
-// Config configures the Ollama client
+// Config defines configuration for the Ollama client.
+//
+// Ollama is for running LLMs locally. It doesn't require an API key.
+//
+// Example:
+//
+//	config := ollama.Config{
+//	    Config: base.Config{
+//	        Model:   "llama2",
+//	        BaseURL: "http://localhost:11434",
+//	    },
+//	}
+//	client, err := ollama.New(config)
 type Config struct {
 	base.Config
 }
 
-// Client implements an LLM client for Ollama
+// Client is an Ollama LLM client.
+//
+// Ollama allows you to run large language models locally on your machine.
+// This client connects to a local Ollama server (default: localhost:11434)
+// and provides the same interface as cloud-based providers.
+//
+// No API key is required. The client uses a longer default timeout (60s)
+// since local models may take more time to generate responses.
 type Client struct {
 	base *base.Client
 }
 
-// Message represents a message in the conversation
-type Message struct {
+// Ollama-specific wire format
+type ollamaMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
 }
 
-// ChatCompletionRequest represents a chat completion request
-type ChatCompletionRequest struct {
-	Model       string    `json:"model"`
-	Messages    []Message `json:"messages"`
-	Temperature float64   `json:"temperature,omitempty"`
-	MaxTokens   int       `json:"max_tokens,omitempty"`
-	Stream      bool      `json:"stream,omitempty"`
+type ollamaRequest struct {
+	Model    string          `json:"model"`
+	Messages []ollamaMessage `json:"messages"`
+	Stream   bool            `json:"stream,omitempty"`
+	Options  *ollamaOptions  `json:"options,omitempty"`
 }
 
-// Choice represents a choice in the chat completion response
-type Choice struct {
-	Index        int     `json:"index"`
-	Message      Message `json:"message"`
-	FinishReason string  `json:"finish_reason"`
+type ollamaOptions struct {
+	Temperature float64 `json:"temperature,omitempty"`
+	NumPredict  int     `json:"num_predict,omitempty"` // max tokens
 }
 
-// ChatCompletionResponse represents a chat completion response
-type ChatCompletionResponse struct {
-	Model              string  `json:"model"`
-	CreatedAt          string  `json:"created_at"`
-	Message            Message `json:"message"`
-	Done               bool    `json:"done"`
-	DoneReason         string  `json:"done_reason"`
-	TotalDuration      int64   `json:"total_duration"`
-	LoadDuration       int64   `json:"load_duration"`
-	PromptEvalCount    int     `json:"prompt_eval_count"`
-	PromptEvalDuration int64   `json:"prompt_eval_duration"`
-	EvalCount          int     `json:"eval_count"`
-	EvalDuration       int64   `json:"eval_duration"`
-}
-
-// Usage represents usage information
-type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
-}
-
-// Delta represents a delta in the streaming response
-type Delta struct {
-	Content string `json:"content,omitempty"`
-}
-
-// StreamChoice represents a choice in the streaming response
-type StreamChoice struct {
-	Index        int    `json:"index"`
-	Delta        *Delta `json:"delta,omitempty"`
-	FinishReason string `json:"finish_reason,omitempty"`
-}
-
-// StreamChunk represents a chunk in the streaming response
-type StreamChunk struct {
-	Model              string   `json:"model"`
-	CreatedAt          string   `json:"created_at"`
-	Message            *Message `json:"message,omitempty"`
-	Delta              *Delta   `json:"delta,omitempty"`
-	Done               bool     `json:"done"`
-	DoneReason         string   `json:"done_reason,omitempty"`
-	TotalDuration      int64    `json:"total_duration,omitempty"`
-	LoadDuration       int64    `json:"load_duration,omitempty"`
-	PromptEvalCount    int      `json:"prompt_eval_count,omitempty"`
-	PromptEvalDuration int64    `json:"prompt_eval_duration,omitempty"`
-	EvalCount          int      `json:"eval_count,omitempty"`
-	EvalDuration       int64    `json:"eval_duration,omitempty"`
-}
-
-// ErrorResponse represents an error response
-type ErrorResponse struct {
-	Error string `json:"error"`
+type ollamaResponse struct {
+	Model              string         `json:"model"`
+	CreatedAt          string         `json:"created_at"`
+	Message            *ollamaMessage `json:"message,omitempty"`
+	Done               bool           `json:"done"`
+	DoneReason         string         `json:"done_reason,omitempty"`
+	PromptEvalCount    int            `json:"prompt_eval_count,omitempty"`
+	EvalCount          int            `json:"eval_count,omitempty"`
 }
 
 // New creates a new Ollama client
@@ -112,7 +82,7 @@ func New(config Config) (*Client, error) {
 	}
 
 	if config.Timeout == 0 {
-		config.Timeout = 60 * time.Second
+		config.Timeout = 60 * time.Second // Ollama needs longer timeout
 	}
 
 	baseClient := base.New(config.Config)
@@ -122,12 +92,13 @@ func New(config Config) (*Client, error) {
 	}, nil
 }
 
-// Complete performs a non-streaming completion
-func (c *Client) Complete(ctx context.Context, prompt string) (string, error) {
-	var response *ChatCompletionResponse
+// Chat performs a non-streaming chat completion
+func (c *Client) Chat(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.Response, error) {
+	options := core.ApplyOptions(opts...)
 
+	var response *core.Response
 	err := c.base.Retry(ctx, func() error {
-		resp, err := c.doComplete(ctx, prompt, false)
+		resp, err := c.doChat(ctx, messages, options, false)
 		if err != nil {
 			return err
 		}
@@ -136,26 +107,21 @@ func (c *Client) Complete(ctx context.Context, prompt string) (string, error) {
 	})
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return response.Message.Content, nil
+	if options.UsageCallback != nil && response.Usage != nil {
+		options.UsageCallback(*response.Usage)
+	}
+
+	return response, nil
 }
 
-// CompleteStream performs a streaming completion
-func (c *Client) CompleteStream(ctx context.Context, prompt string) (<-chan string, error) {
-	reqBody := ChatCompletionRequest{
-		Model: c.base.Config().Model,
-		Messages: []Message{
-			{
-				Role:    "user",
-				Content: prompt,
-			},
-		},
-		Temperature: c.base.Config().Temperature,
-		MaxTokens:   c.base.Config().MaxTokens,
-		Stream:      true,
-	}
+// ChatStream performs a streaming chat completion
+func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.Stream, error) {
+	options := core.ApplyOptions(opts...)
+
+	reqBody := c.buildRequest(messages, options, true)
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
@@ -177,21 +143,11 @@ func (c *Client) CompleteStream(ctx context.Context, prompt string) (<-chan stri
 
 	if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, core.NewNetworkError("failed to read response", err)
-		}
-
-		var errResp ErrorResponse
-		if err := json.Unmarshal(body, &errResp); err == nil {
-			return nil, core.NewAPIError(fmt.Sprintf("error: %s", errResp.Error), nil)
-		}
-
+		body, _ := io.ReadAll(resp.Body)
 		return nil, core.NewAPIError(fmt.Sprintf("request failed with status %d: %s", resp.StatusCode, string(body)), nil)
 	}
 
-	ch := make(chan string, 10)
+	ch := make(chan core.StreamEvent, 10)
 
 	go func() {
 		defer close(ch)
@@ -201,64 +157,53 @@ func (c *Client) CompleteStream(ctx context.Context, prompt string) (<-chan stri
 		for scanner.Scan() {
 			select {
 			case <-ctx.Done():
+				ch <- core.StreamEvent{Type: core.EventError, Err: ctx.Err()}
 				return
 			default:
 			}
 
-			line := scanner.Text()
-			if line == "" {
+			line := scanner.Bytes()
+			if len(line) == 0 {
 				continue
 			}
 
-			var chunk StreamChunk
-			if err := json.Unmarshal([]byte(line), &chunk); err != nil {
-				select {
-				case ch <- "ERROR: " + err.Error():
-				case <-ctx.Done():
-				}
-				return
+			var chunk ollamaResponse
+			if err := json.Unmarshal(line, &chunk); err != nil {
+				continue
 			}
 
-			if chunk.Delta != nil && chunk.Delta.Content != "" {
-				select {
-				case ch <- chunk.Delta.Content:
-				case <-ctx.Done():
-					return
+			if chunk.Message != nil && chunk.Message.Content != "" {
+				ch <- core.StreamEvent{
+					Type:    core.EventContent,
+					Content: chunk.Message.Content,
 				}
-			} else if chunk.Message != nil && chunk.Message.Content != "" {
-				select {
-				case ch <- chunk.Message.Content:
-				case <-ctx.Done():
-					return
+			}
+
+			if chunk.Done {
+				usage := &core.Usage{
+					PromptTokens:     chunk.PromptEvalCount,
+					CompletionTokens: chunk.EvalCount,
+					TotalTokens:      chunk.PromptEvalCount + chunk.EvalCount,
 				}
+				ch <- core.StreamEvent{
+					Type:  core.EventDone,
+					Usage: usage,
+				}
+				return
 			}
 		}
 
 		if err := scanner.Err(); err != nil {
-			select {
-			case ch <- "ERROR: " + err.Error():
-			case <-ctx.Done():
-			}
+			ch <- core.StreamEvent{Type: core.EventError, Err: err}
 		}
 	}()
 
-	return ch, nil
+	return core.NewStream(ch, resp.Body), nil
 }
 
-// doComplete performs a completion request
-func (c *Client) doComplete(ctx context.Context, prompt string, stream bool) (*ChatCompletionResponse, error) {
-	reqBody := ChatCompletionRequest{
-		Model: c.base.Config().Model,
-		Messages: []Message{
-			{
-				Role:    "user",
-				Content: prompt,
-			},
-		},
-		Temperature: c.base.Config().Temperature,
-		MaxTokens:   c.base.Config().MaxTokens,
-		Stream:      stream,
-	}
+// doChat performs the actual chat request
+func (c *Client) doChat(ctx context.Context, messages []core.Message, options core.Options, stream bool) (*core.Response, error) {
+	reqBody := c.buildRequest(messages, options, stream)
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
@@ -277,71 +222,99 @@ func (c *Client) doComplete(ctx context.Context, prompt string, stream bool) (*C
 	if err != nil {
 		return nil, core.NewNetworkError("failed to send request", err)
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		defer resp.Body.Close()
-
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, core.NewNetworkError("failed to read response", err)
-		}
-
-		var errResp ErrorResponse
-		if err := json.Unmarshal(body, &errResp); err == nil {
-			return nil, core.NewAPIError(fmt.Sprintf("error: %s", errResp.Error), nil)
-		}
-
+		body, _ := io.ReadAll(resp.Body)
 		return nil, core.NewAPIError(fmt.Sprintf("request failed with status %d: %s", resp.StatusCode, string(body)), nil)
 	}
 
-	defer resp.Body.Close()
+	// Ollama returns streaming format even for non-streaming requests
+	// We need to accumulate all chunks
+	var content string
+	var usage core.Usage
 
-	// Read response line by line
 	scanner := bufio.NewScanner(resp.Body)
-	var fullContent string
-	var lastChunk StreamChunk
-
 	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
+		var chunk ollamaResponse
+		if err := json.Unmarshal(scanner.Bytes(), &chunk); err != nil {
 			continue
 		}
 
-		var chunk StreamChunk
-		if err := json.Unmarshal([]byte(line), &chunk); err != nil {
-			return nil, core.NewValidationError("failed to unmarshal chunk", err)
+		if chunk.Message != nil {
+			content += chunk.Message.Content
 		}
 
-		lastChunk = chunk
-
-		if chunk.Delta != nil && chunk.Delta.Content != "" {
-			fullContent += chunk.Delta.Content
-		} else if chunk.Message != nil && chunk.Message.Content != "" {
-			fullContent += chunk.Message.Content
+		if chunk.Done {
+			usage = core.Usage{
+				PromptTokens:     chunk.PromptEvalCount,
+				CompletionTokens: chunk.EvalCount,
+				TotalTokens:      chunk.PromptEvalCount + chunk.EvalCount,
+			}
 		}
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, core.NewNetworkError("failed to read response", err)
-	}
-
-	// Create final response
-	response := &ChatCompletionResponse{
-		Model:     lastChunk.Model,
-		CreatedAt: lastChunk.CreatedAt,
-		Message: Message{
-			Role:    "assistant",
-			Content: fullContent,
+	return &core.Response{
+		Model:   c.resolveModel(options),
+		Content: content,
+		Message: core.Message{
+			Role: core.RoleAssistant,
+			Content: []core.ContentBlock{
+				{Type: core.ContentTypeText, Text: content},
+			},
 		},
-		Done:               lastChunk.Done,
-		DoneReason:         lastChunk.DoneReason,
-		TotalDuration:      lastChunk.TotalDuration,
-		LoadDuration:       lastChunk.LoadDuration,
-		PromptEvalCount:    lastChunk.PromptEvalCount,
-		PromptEvalDuration: lastChunk.PromptEvalDuration,
-		EvalCount:          lastChunk.EvalCount,
-		EvalDuration:       lastChunk.EvalDuration,
+		Usage: &usage,
+	}, nil
+}
+
+// buildRequest builds an Ollama API request
+func (c *Client) buildRequest(messages []core.Message, options core.Options, stream bool) ollamaRequest {
+	var ollamaMessages []ollamaMessage
+
+	// Add system prompt if provided
+	if options.SystemPrompt != "" {
+		ollamaMessages = append(ollamaMessages, ollamaMessage{
+			Role:    core.RoleSystem,
+			Content: options.SystemPrompt,
+		})
 	}
 
-	return response, nil
+	// Convert messages
+	for _, msg := range messages {
+		ollamaMessages = append(ollamaMessages, ollamaMessage{
+			Role:    msg.Role,
+			Content: msg.TextContent(),
+		})
+	}
+
+	req := ollamaRequest{
+		Model:    c.resolveModel(options),
+		Messages: ollamaMessages,
+		Stream:   stream,
+	}
+
+	// Add options if any are set
+	if options.Temperature != nil || options.MaxTokens != nil {
+		req.Options = &ollamaOptions{}
+		if options.Temperature != nil {
+			req.Options.Temperature = *options.Temperature
+		} else {
+			req.Options.Temperature = c.base.Config().Temperature
+		}
+		if options.MaxTokens != nil {
+			req.Options.NumPredict = *options.MaxTokens
+		} else if c.base.Config().MaxTokens > 0 {
+			req.Options.NumPredict = c.base.Config().MaxTokens
+		}
+	}
+
+	return req
+}
+
+// Helper methods
+func (c *Client) resolveModel(opts core.Options) string {
+	if opts.Model != "" {
+		return opts.Model
+	}
+	return c.base.Config().Model
 }

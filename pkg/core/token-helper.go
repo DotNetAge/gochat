@@ -2,7 +2,7 @@ package core
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"time"
 )
 
@@ -15,12 +15,12 @@ func (h *TokenHelper) SaveToken(token *OAuthToken, filename string) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(filename, data, 0600)
+	return os.WriteFile(filename, data, 0600)
 }
 
 // LoadToken 从文件加载令牌
 func (h *TokenHelper) LoadToken(filename string) (*OAuthToken, error) {
-	data, err := ioutil.ReadFile(filename)
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}

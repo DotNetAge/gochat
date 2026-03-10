@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -75,7 +75,11 @@ func (p *MiniMaxProvider) RequestOAuthCode() (*MiniMaxOAuthAuthorization, string
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("x-request-id", p.PKCEHelper.GenerateUUID())
+	requestID, err := p.PKCEHelper.GenerateUUID()
+	if err != nil {
+		return nil, "", "", err
+	}
+	req.Header.Set("x-request-id", requestID)
 
 	resp, err := p.HTTPClient.Do(req)
 	if err != nil {
@@ -83,7 +87,7 @@ func (p *MiniMaxProvider) RequestOAuthCode() (*MiniMaxOAuthAuthorization, string
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -125,7 +129,7 @@ func (p *MiniMaxProvider) PollOAuthToken(userCode, verifier string) (status stri
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "error", nil, err.Error()
 	}
@@ -240,7 +244,7 @@ func (p *MiniMaxProvider) RefreshToken(refreshToken string) (*core.OAuthToken, e
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

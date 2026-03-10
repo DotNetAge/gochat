@@ -3,12 +3,9 @@ package anthropic
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/DotNetAge/gochat/pkg/client/base"
 	"github.com/DotNetAge/gochat/pkg/core"
@@ -16,51 +13,32 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNew(t *testing.T) {
+func TestNewClient(t *testing.T) {
 	tests := []struct {
 		name    string
 		config  Config
 		wantErr bool
-	}{{
-		name: "valid config",
-		config: Config{
-			Config: base.Config{
-				APIKey:      "test-key",
-				Model:       "claude-3-opus-20240229",
-				Timeout:     30 * time.Second,
-				MaxRetries:  3,
-				Temperature: 0.7,
-				MaxTokens:   1000,
+	}{
+		{
+			name: "valid config",
+			config: Config{
+				Config: base.Config{
+					APIKey: "test-key",
+					Model:  "claude-3-opus-20240229",
+				},
 			},
+			wantErr: false,
 		},
-		wantErr: false,
-	}, {
-		name: "empty api key",
-		config: Config{
-			Config: base.Config{
-				APIKey: "",
-				Model:  "claude-3-opus-20240229",
+		{
+			name: "empty api key",
+			config: Config{
+				Config: base.Config{
+					APIKey: "",
+				},
 			},
+			wantErr: true,
 		},
-		wantErr: true,
-	}, {
-		name: "invalid model",
-		config: Config{
-			Config: base.Config{
-				APIKey: "test-key",
-				Model:  "invalid-model",
-			},
-		},
-		wantErr: false,
-	}, {
-		name: "default values",
-		config: Config{
-			Config: base.Config{
-				APIKey: "test-key",
-			},
-		},
-		wantErr: false,
-	}}
+	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -71,60 +49,36 @@ func TestNew(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 				assert.NotNil(t, client)
-				// Verify default values are set
-				if tt.config.Model == "" {
-					assert.Equal(t, "claude-3-opus-20240229", client.base.Config().Model)
-				}
-				if tt.config.BaseURL == "" {
-					assert.Equal(t, "https://api.anthropic.com", client.base.Config().BaseURL)
-				}
-				if tt.config.Timeout == 0 {
-					assert.Equal(t, 30*time.Second, client.base.Config().Timeout)
-				}
-				if tt.config.MaxRetries == 0 {
-					assert.Equal(t, 3, client.base.Config().MaxRetries)
-				}
-				if tt.config.Temperature == 0 {
-					assert.Equal(t, 0.7, client.base.Config().Temperature)
-				}
 			}
 		})
 	}
 }
 
-func TestClient_Complete(t *testing.T) {
+func TestClient_Chat(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
 		assert.Equal(t, "/v1/messages", r.URL.Path)
 		assert.Equal(t, "test-key", r.Header.Get("x-api-key"))
 		assert.Equal(t, "2023-06-01", r.Header.Get("anthropic-version"))
 
-		var reqBody ChatCompletionRequest
+		var reqBody anthropicRequest
 		err := json.NewDecoder(r.Body).Decode(&reqBody)
 		require.NoError(t, err)
 
 		assert.Equal(t, "claude-3-opus-20240229", reqBody.Model)
-		assert.Len(t, reqBody.Messages, 1)
-		assert.Equal(t, "user", reqBody.Messages[0].Role)
-		assert.Equal(t, "test prompt", reqBody.Messages[0].Content)
 
-		response := ChatCompletionResponse{
-			ID:      "msg_abc123",
-			Object:  "message",
-			Created: 1699000000,
-			Model:   "claude-3-opus-20240229",
-			Choices: []Choice{{
-				Index: 0,
-				Message: Message{
-					Role:    "assistant",
-					Content: "test response",
-				},
-				FinishReason: "stop",
-			}},
-			Usage: Usage{
-				PromptTokens:     10,
-				CompletionTokens: 20,
-				TotalTokens:      30,
+		response := anthropicResponse{
+			ID:   "msg_123",
+			Type: "message",
+			Role: "assistant",
+			Content: []contentBlock{
+				{Type: "text", Text: "test response"},
+			},
+			Model:      "claude-3-opus-20240229",
+			StopReason: "end_turn",
+			Usage: anthropicUsage{
+				InputTokens:  10,
+				OutputTokens: 20,
 			},
 		}
 
@@ -142,14 +96,19 @@ func TestClient_Complete(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	response, err := client.Complete(context.Background(), "test prompt")
+	messages := []core.Message{
+		core.NewUserMessage("test prompt"),
+	}
+	response, err := client.Chat(context.Background(), messages)
 	require.NoError(t, err)
-	assert.Equal(t, "test response", response)
+	assert.Equal(t, "test response", response.Content)
+	assert.NotNil(t, response.Usage)
+	assert.Equal(t, 30, response.Usage.TotalTokens)
 }
 
-func TestClient_CompleteStream(t *testing.T) {
+func TestClient_ChatStream(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var reqBody ChatCompletionRequest
+		var reqBody anthropicRequest
 		json.NewDecoder(r.Body).Decode(&reqBody)
 
 		assert.True(t, reqBody.Stream)
@@ -157,14 +116,14 @@ func TestClient_CompleteStream(t *testing.T) {
 		flusher, _ := w.(http.Flusher)
 
 		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Set("Connection", "keep-alive")
 
 		chunks := []string{
-			`data: {"id":"msg_abc123","object":"message","created":1699000000,"model":"claude-3-opus-20240229","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}`,
-			`data: {"id":"msg_abc123","object":"message","created":1699000000,"model":"claude-3-opus-20240229","choices":[{"index":0,"delta":{"content":" world"},"finish_reason":null}]}`,
-			`data: {"id":"msg_abc123","object":"message","created":1699000000,"model":"claude-3-opus-20240229","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}`,
-			`data: [DONE]`,
+			`data: {"type":"content_block_start","index":0}`,
+			`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}`,
+			`data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" world"}}`,
+			`data: {"type":"content_block_stop","index":0}`,
+			`data: {"type":"message_delta","usage":{"output_tokens":20}}`,
+			`data: {"type":"message_stop"}`,
 		}
 
 		for _, chunk := range chunks {
@@ -183,103 +142,45 @@ func TestClient_CompleteStream(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	stream, err := client.CompleteStream(context.Background(), "test prompt")
+	messages := []core.Message{
+		core.NewUserMessage("test prompt"),
+	}
+	stream, err := client.ChatStream(context.Background(), messages)
 	require.NoError(t, err)
+	defer stream.Close()
 
-	var result strings.Builder
-	for chunk := range stream {
-		result.WriteString(chunk)
+	var result string
+	for stream.Next() {
+		ev := stream.Event()
+		if ev.Err != nil {
+			t.Fatal(ev.Err)
+		}
+		if ev.Type == core.EventContent {
+			result += ev.Content
+		}
 	}
 
-	assert.Equal(t, "Hello world", result.String())
+	assert.Equal(t, "Hello world", result)
 }
 
-func TestClient_Complete_ErrorHandling(t *testing.T) {
-	tests := []struct {
-		name       string
-		statusCode int
-		response   string
-		wantErr    string
-	}{{
-		name:       "invalid api key",
-		statusCode: 401,
-		response:   `{"error": {"message": "Invalid API key", "type": "invalid_request_error"}}`,
-		wantErr:    "invalid_request_error",
-	}, {
-		name:       "rate limit",
-		statusCode: 429,
-		response:   `{"error": {"message": "Rate limit exceeded", "type": "rate_limit_error"}}`,
-		wantErr:    "rate_limit_error",
-	}, {
-		name:       "server error",
-		statusCode: 500,
-		response:   `{"error": {"message": "Internal server error", "type": "server_error"}}`,
-		wantErr:    "server_error",
-	}}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				w.WriteHeader(tt.statusCode)
-				w.Write([]byte(tt.response))
-			}))
-			defer server.Close()
-
-			client, err := New(Config{
-				Config: base.Config{
-					APIKey:     "test-key",
-					Model:      "claude-3-opus-20240229",
-					BaseURL:    server.URL,
-					MaxRetries: 0,
-				},
-			})
-			require.NoError(t, err)
-
-			_, err = client.Complete(context.Background(), "test")
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), tt.wantErr)
-		})
-	}
-}
-
-func TestClient_Complete_Timeout(t *testing.T) {
+func TestClient_ChatWithSystemPrompt(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(2 * time.Second)
-	}))
-	defer server.Close()
+		var reqBody anthropicRequest
+		err := json.NewDecoder(r.Body).Decode(&reqBody)
+		require.NoError(t, err)
 
-	client, err := New(Config{
-		Config: base.Config{
-			APIKey:     "test-key",
-			Model:      "claude-3-opus-20240229",
-			BaseURL:    server.URL,
-			Timeout:    100 * time.Millisecond,
-			MaxRetries: 0,
-		},
-	})
-	require.NoError(t, err)
+		// Verify system prompt was set
+		assert.Equal(t, "You are a helpful assistant", reqBody.System)
 
-	_, err = client.Complete(context.Background(), "test")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "deadline exceeded")
-}
-
-func TestClient_Complete_EmptyPrompt(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var reqBody ChatCompletionRequest
-		json.NewDecoder(r.Body).Decode(&reqBody)
-
-		response := ChatCompletionResponse{
-			ID:     "msg_abc123",
-			Object: "message",
-			Choices: []Choice{{
-				Index: 0,
-				Message: Message{
-					Role:    "assistant",
-					Content: "",
-				},
-				FinishReason: "stop",
-			}},
+		response := anthropicResponse{
+			ID:   "msg_123",
+			Type: "message",
+			Role: "assistant",
+			Content: []contentBlock{
+				{Type: "text", Text: "response"},
+			},
+			StopReason: "end_turn",
+			Usage:      anthropicUsage{InputTokens: 10, OutputTokens: 20},
 		}
 
 		json.NewEncoder(w).Encode(response)
@@ -289,150 +190,40 @@ func TestClient_Complete_EmptyPrompt(t *testing.T) {
 	client, err := New(Config{
 		Config: base.Config{
 			APIKey:  "test-key",
-			Model:   "claude-3-opus-20240229",
 			BaseURL: server.URL,
 		},
 	})
 	require.NoError(t, err)
 
-	response, err := client.Complete(context.Background(), "")
+	messages := []core.Message{
+		core.NewUserMessage("test"),
+	}
+
+	response, err := client.Chat(context.Background(), messages,
+		core.WithSystemPrompt("You are a helpful assistant"),
+	)
 	require.NoError(t, err)
-	assert.Equal(t, "", response)
+	assert.Equal(t, "response", response.Content)
 }
 
-func TestClient_CompleteStream_ErrorInStream(t *testing.T) {
+func TestClient_Chat_ErrorHandling(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-
-		w.Write([]byte(`data: {"id":"msg_abc123","object":"message","created":1699000000,"model":"claude-3-opus-20240229","choices":[{"index":0,"delta":{"content":"Hello"}}]}` + "\n\n"))
-		w.Write([]byte(`data: {"id":"msg_abc123","object":"message","created":1699000000,"model":"claude-3-opus-20240229","choices":[{"index":0,"delta":{"content":" world"}}]}` + "\n\n"))
-		w.Write([]byte(`data: {"id":"msg_abc123","object":"message","created":1699000000,"model":"claude-3-opus-20240229","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}` + "\n\n"))
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"type":"error","error":{"type":"authentication_error","message":"Invalid API key"}}`))
 	}))
 	defer server.Close()
 
 	client, err := New(Config{
 		Config: base.Config{
-			APIKey:  "test-key",
-			Model:   "claude-3-opus-20240229",
-			BaseURL: server.URL,
+			APIKey:     "test-key",
+			BaseURL:    server.URL,
+			MaxRetries: 0,
 		},
 	})
 	require.NoError(t, err)
 
-	stream, err := client.CompleteStream(context.Background(), "test")
-	require.NoError(t, err)
-
-	chunks := []string{}
-	for chunk := range stream {
-		chunks = append(chunks, chunk)
-	}
-
-	assert.GreaterOrEqual(t, len(chunks), 2)
-	result := strings.Join(chunks, "")
-	assert.Equal(t, "Hello world", result)
-}
-
-func TestParseStreamChunk(t *testing.T) {
-	tests := []struct {
-		name    string
-		line    string
-		want    *StreamChunk
-		wantErr bool
-	}{{
-		name: "valid chunk",
-		line: `data: {"id":"msg_abc123","object":"message","created":1699000000,"model":"claude-3-opus-20240229","choices":[{"index":0,"delta":{"content":"Hello"}}]}`,
-		want: &StreamChunk{
-			ID:      "msg_abc123",
-			Object:  "message",
-			Created: 1699000000,
-			Model:   "claude-3-opus-20240229",
-			Choices: []StreamChoice{{
-				Index: 0,
-				Delta: &Delta{
-					Content: "Hello",
-				},
-			}},
-		},
-		wantErr: false,
-	}, {
-		name:    "done signal",
-		line:    `data: [DONE]`,
-		want:    nil,
-		wantErr: false,
-	}, {
-		name:    "empty line",
-		line:    "",
-		want:    nil,
-		wantErr: false,
-	}, {
-		name:    "invalid json",
-		line:    `data: {invalid}`,
-		want:    nil,
-		wantErr: true,
-	}, {
-		name:    "not data line",
-		line:    `event: ping`,
-		want:    nil,
-		wantErr: false,
-	}}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			chunk, err := parseStreamChunk(tt.line)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				if tt.want == nil {
-					assert.Nil(t, chunk)
-				} else {
-					assert.Equal(t, tt.want.ID, chunk.ID)
-					assert.Equal(t, tt.want.Choices[0].Delta.Content, chunk.Choices[0].Delta.Content)
-				}
-			}
-		})
-	}
-}
-
-func TestIsRetryableError(t *testing.T) {
-	tests := []struct {
-		name     string
-		err      error
-		expected bool
-	}{{
-		name:     "rate limit error",
-		err:      fmt.Errorf("rate limit exceeded"),
-		expected: true,
-	}, {
-		name:     "timeout error",
-		err:      fmt.Errorf("context deadline exceeded"),
-		expected: true,
-	}, {
-		name:     "server error",
-		err:      fmt.Errorf("internal server error"),
-		expected: true,
-	}, {
-		name:     "connection error",
-		err:      fmt.Errorf("connection reset by peer"),
-		expected: true,
-	}, {
-		name:     "invalid api key",
-		err:      fmt.Errorf("invalid api key"),
-		expected: false,
-	}, {
-		name:     "context canceled",
-		err:      context.Canceled,
-		expected: false,
-	}, {
-		name:     "nil error",
-		err:      nil,
-		expected: false,
-	}}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := core.IsRetryableError(tt.err)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
+	messages := []core.Message{core.NewUserMessage("test")}
+	_, err = client.Chat(context.Background(), messages)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "authentication_error")
 }

@@ -4,77 +4,48 @@ import (
 	"context"
 )
 
-// Client defines the interface for LLM clients
+// Client is the primary interface for LLM interactions.
+// All providers implement this interface.
 //
-// This interface is implemented by all LLM providers
-// (OpenAI, Anthropic, Azure OpenAI, Ollama, Compatible)
-// and allows the RAG engine to generate responses using LLMs.
+// Example usage:
 //
-// Example implementation:
-//
-//	type OpenAIClient struct {
-//	    client *openai.Client
-//	    config Config
+//	messages := []core.Message{
+//	    core.NewUserMessage("Hello, who are you?"),
 //	}
-//
-//	func (c *OpenAIClient) Complete(ctx context.Context, prompt string) (string, error) {
-//	    // Call OpenAI API to generate completion
+//	response, err := client.Chat(ctx, messages)
+//	if err != nil {
+//	    log.Fatal(err)
 //	}
+//	fmt.Println(response.Content)
 //
-//	func (c *OpenAIClient) CompleteStream(ctx context.Context, prompt string) (<-chan string, error) {
-//	    // Call OpenAI API for streaming completion
-//	}
+// With options:
+//
+//	response, err := client.Chat(ctx, messages,
+//	    core.WithTemperature(0.8),
+//	    core.WithMaxTokens(1000),
+//	)
 type Client interface {
-	// Complete generates a completion for the given prompt
+	// Chat sends messages and returns a complete response
 	//
 	// Parameters:
 	// - ctx: Context for cancellation and timeout
-	// - prompt: Prompt text to generate completion for
+	// - messages: Conversation messages
+	// - opts: Optional parameters (temperature, max tokens, tools, etc.)
 	//
 	// Returns:
-	// - string: Generated completion
-	// - error: Error if completion generation fails
-	Complete(ctx context.Context, prompt string) (string, error)
+	// - *Response: Complete response with content, usage, and tool calls
+	// - error: Error if the request fails
+	Chat(ctx context.Context, messages []Message, opts ...Option) (*Response, error)
 
-	// CompleteStream generates a completion for the given prompt and returns a channel for streaming responses
+	// ChatStream sends messages and returns a stream of events
 	//
 	// Parameters:
 	// - ctx: Context for cancellation and timeout
-	// - prompt: Prompt text to generate completion for
+	// - messages: Conversation messages
+	// - opts: Optional parameters (temperature, max tokens, tools, etc.)
 	//
 	// Returns:
-	// - <-chan string: Channel for streaming completion chunks
-	// - error: Error if streaming completion fails
-	CompleteStream(ctx context.Context, prompt string) (<-chan string, error)
-}
-
-// Config defines common configuration for LLM clients
-//
-// This struct contains configuration options that are common
-// across all LLM providers.
-//
-// Example:
-//
-//	config := Config{
-//	    APIKey:      "your-api-key",
-//	    Model:       "gpt-4",
-//	    Temperature: 0.7,
-//	    MaxTokens:   1000,
-//	}
-//
-// Alternative using AuthToken:
-//
-//	config := Config{
-//	    AuthToken:   "your-auth-token",
-//	    Model:       "gpt-4",
-//	    Temperature: 0.7,
-//	    MaxTokens:   1000,
-//	}
-type Config struct {
-	APIKey      string  // API key for the LLM provider
-	AuthToken   string  // Auth token for the LLM provider (alternative to APIKey)
-	Model       string  // Model name to use
-	BaseURL     string  // Base URL for API requests (optional)
-	Temperature float64 // Temperature for generation (0.0-1.0)
-	MaxTokens   int     // Maximum tokens to generate
+	// - *Stream: Stream of events (content, usage, errors)
+	// - error: Error if the request fails to start
+	ChatStream(ctx context.Context, messages []Message, opts ...Option) (*Stream, error)
 }

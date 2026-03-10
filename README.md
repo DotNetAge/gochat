@@ -1,25 +1,37 @@
 # GoChat
 
-GoChat是一个Go语言库，用于与多种LLM（大型语言模型）提供商进行交互。它提供了统一的接口和丰富的功能，使开发者能够轻松集成不同的LLM服务。
+[**English**](README.md) | [简体中文](README_zh.md)
 
-## 功能特性
+GoChat is a **modern, enterprise-ready Go client SDK for Large Language Models (LLMs)**. It provides an exceptionally elegant and type-safe unified interface that completely smooths out the chaotic API differences between OpenAI, Anthropic (Claude), DeepSeek, Qwen, Ollama, and other major cloud providers or local models.
 
-- 支持多种LLM提供商：OpenAI、Anthropic、Ollama、兼容OpenAI API的服务
-- 支持API Key和Auth Token两种认证方式
-- 支持流式和非流式请求
-- 内置重试机制，带有指数退避策略
-- 结构化错误处理
-- 支持从环境变量获取API密钥，提高安全性
+Whether you need basic chat, **Deep Thinking (Reasoning)**, **Built-in Web Search**, **Multimodal (Vision/Documents)**, or even enterprise-level **OAuth 2.0 / Portal Gateway Authentication Persistence**, you only need to master one set of interfaces to roam freely.
 
-## 安装
+---
+
+## ✨ Killer Features
+
+- **🔌 Seamless Model Switching**: Change one line of initialization code to switch your application effortlessly between GPT-4o, Claude 3.7, DeepSeek-R1, and Qwen-Max, without even touching the `Messages` struct.
+- **🧠 Native Deep Thinking Support**: Built-in interceptors perfectly compatible with the reasoning chains of DeepSeek-R1, Claude 3.7, and OpenAI o1/o3. The streaming API beautifully separates the model's "internal thought process" from its final answer.
+- **🌐 Turn on Web Search at Will**: Native support for models with external web retrieval capabilities (like Qwen). A single line of code `core.WithEnableSearch(true)` unlocks real-time superpowers.
+- **🛡️ Smart Secret Hosting**: Say goodbye to hardcoded secret leaks! Pass in an alias key name (e.g., `DASHSCOPE_API_KEY`), and the engine automatically sniffs and extracts system environment variables for secure authentication.
+- **🏢 Enterprise OAuth2 Persistence**: The powerful built-in `AuthManager` is designed for accessing enterprise gateways (like Qwen Portal or GCP Gemini). It fully automates the Device Code Flow / OAuth2 authorization, persistent Token storage (supports custom Stores like Memory/File/Database), and silent, seamless auto-refreshing.
+- **🛠️ Complete Agent Infrastructure**: Multi-turn conversation context management, structured Tool/Function Calling, document reading & extraction, and multimodal image recognition—all out of the box.
+
+---
+
+## 📦 Installation
 
 ```bash
 go get github.com/DotNetAge/gochat
 ```
 
-## 使用示例
+---
 
-### OpenAI客户端
+## 🚀 Quick Start (Everything you need to know)
+
+### 1. Basic Chat (with Smart Secret Hosting)
+
+Set up your environment variables, e.g., `export OPENAI_API_KEY="sk-..."`.
 
 ```go
 package main
@@ -27,209 +39,134 @@ package main
 import (
 	"context"
 	"fmt"
-
+	"github.com/DotNetAge/gochat/pkg/client/base"
 	"github.com/DotNetAge/gochat/pkg/client/openai"
+	"github.com/DotNetAge/gochat/pkg/core"
 )
 
 func main() {
-	// 使用API Key
-	config := openai.Config{
+	// The engine detects "OPENAI_API_KEY" as an env var name and safely retrieves the real key from the system!
+	client, _ := openai.New(openai.Config{
 		Config: base.Config{
-			APIKey:  "your-api-key",
-			Model:   "gpt-3.5-turbo",
-			BaseURL: "https://api.openai.com",
+			APIKey: "OPENAI_API_KEY",
+			Model:  "gpt-4o",
 		},
-	}
+	})
 
-	// 或者使用Auth Token
-	// config := openai.Config{
-	//     Config: base.Config{
-	//         AuthToken: "your-auth-token",
-	//         Model:     "gpt-3.5-turbo",
-	//         BaseURL:   "https://api.openai.com",
-	//     },
-	// }
+	resp, _ := client.Chat(context.Background(), []core.Message{
+		core.NewUserMessage("Hello, please introduce yourself."),
+	})
 
-	client, err := openai.New(config)
-	if err != nil {
-		fmt.Printf("Error creating client: %v\n", err)
-		return
-	}
-
-	// 非流式请求
-	response, err := client.Complete(context.Background(), "Hello, who are you?")
-	if err != nil {
-		fmt.Printf("Error getting completion: %v\n", err)
-		return
-	}
-	fmt.Printf("Response: %s\n", response)
-
-	// 流式请求
-	stream, err := client.CompleteStream(context.Background(), "Write a short poem about AI")
-	if err != nil {
-		fmt.Printf("Error getting stream: %v\n", err)
-		return
-	}
-
-	fmt.Println("Streaming response:")
-	for chunk := range stream {
-		fmt.Print(chunk)
-	}
-	fmt.Println()
+	fmt.Println(resp.Content)
 }
 ```
 
-### Anthropic客户端
+### 2. Switching to DeepSeek & Capturing the "Chain of Thought" in a Stream?
+
+Just change a few lines of initialization code and add the `WithThinking` option:
 
 ```go
-package main
+import "github.com/DotNetAge/gochat/pkg/client/deepseek"
 
-import (
-	"context"
-	"fmt"
+client, _ := deepseek.New(deepseek.Config{
+	Config: base.Config{
+		APIKey: "DEEPSEEK_API_KEY", 
+		// No need to explicitly specify deepseek-reasoner; it automatically adapts when thinking is enabled.
+	},
+})
 
-	"github.com/DotNetAge/gochat/pkg/client/anthropic"
-)
+// Enable the thinking engine and use streaming output
+stream, _ := client.ChatStream(ctx, messages, core.WithThinking(0))
+defer stream.Close()
 
-func main() {
-	config := anthropic.Config{
-		Config: base.Config{
-			APIKey:  "your-api-key",
-			Model:   "claude-3-opus-20240229",
-			BaseURL: "https://api.anthropic.com",
-		},
+fmt.Println("[🤔 Deep Thinking Process]:")
+isAnswering := false
+
+for stream.Next() {
+	ev := stream.Event()
+	
+	if ev.Type == core.EventThinking { // Capture the internal reasoning logic
+		fmt.Print(ev.Content)
+	} else if ev.Type == core.EventContent {
+		if !isAnswering {
+			fmt.Println("\n\n[💡 Final Answer]:")
+			isAnswering = true
+		}
+		fmt.Print(ev.Content)
 	}
-
-	client, err := anthropic.New(config)
-	if err != nil {
-		fmt.Printf("Error creating client: %v\n", err)
-		return
-	}
-
-	response, err := client.Complete(context.Background(), "Hello, who are you?")
-	if err != nil {
-		fmt.Printf("Error getting completion: %v\n", err)
-		return
-	}
-	fmt.Printf("Response: %s\n", response)
 }
 ```
 
-### Ollama客户端
+### 3. Calling Alibaba Qwen and Enabling Built-in Web Search?
 
 ```go
-package main
+import "github.com/DotNetAge/gochat/pkg/client/compatible"
 
-import (
-	"context"
-	"fmt"
+client, _ := compatible.New(compatible.Config{
+	Config: base.Config{
+		APIKey:  "DASHSCOPE_API_KEY",
+		Model:   "qwen-max",
+		BaseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+	},
+})
 
-	"github.com/DotNetAge/gochat/pkg/client/ollama"
-)
+// One line of code grants the model real-time web retrieval capabilities
+resp, _ := client.Chat(ctx, []core.Message{
+	core.NewUserMessage("How are the top three NASDAQ indices performing today?"),
+}, core.WithEnableSearch(true))
 
-func main() {
-	config := ollama.Config{
-		Config: base.Config{
-			Model:   "llama2",
-			BaseURL: "http://localhost:11434",
-		},
-	}
-
-	client, err := ollama.New(config)
-	if err != nil {
-		fmt.Printf("Error creating client: %v\n", err)
-		return
-	}
-
-	response, err := client.Complete(context.Background(), "Hello, who are you?")
-	if err != nil {
-		fmt.Printf("Error getting completion: %v\n", err)
-		return
-	}
-	fmt.Printf("Response: %s\n", response)
-}
+fmt.Println(resp.Content)
 ```
 
-### 兼容OpenAI API的客户端
+### 4. Advanced: Logging into Enterprise Gateways via OAuth2/Device Code?
+
+If your provider (like Qwen Portal or Gemini) doesn't allow simple API Keys but requires user authorization to issue an `Access Token`, don't panic. Hand it over to `AuthManager`.
 
 ```go
-package main
+import "github.com/DotNetAge/gochat/pkg/core"
+import "github.com/DotNetAge/gochat/pkg/provider"
 
-import (
-	"context"
-	"fmt"
+// 1. Initialize the provider's OAuth protocol implementation
+p := provider.NewQwenProvider()
 
-	"github.com/DotNetAge/gochat/pkg/client/compatible"
-)
+// 2. Mount it to the AuthManager, specifying a local persistence file (or inject your Redis Store)
+authMgr := core.NewAuthManager(p, "token_store.json")
 
-func main() {
-	config := compatible.Config{
-		Config: base.Config{
-			APIKey:  "your-api-key",
-			Model:   "gpt-3.5-turbo",
-			BaseURL: "https://api.example.com", // 替换为兼容OpenAI API的服务地址
-		},
-	}
+// 3. Smartly fetch the Token
+// - If it exists locally and isn't expired: Return directly.
+// - If it's expired: Silently Auto-Refresh via the gateway and overwrite the old file.
+// - If it doesn't exist: Automatically pop up the browser auth flow, intercept the Callback, and save the new Token!
+token, _ := authMgr.GetToken()
 
-	client, err := compatible.New(config)
-	if err != nil {
-		fmt.Printf("Error creating client: %v\n", err)
-		return
-	}
+// 4. Seamlessly pass the dynamically acquired Token to the client
+client, _ := compatible.New(compatible.Config{
+	Config: base.Config{
+		AuthToken: token.Access, // <--- Use dynamic token
+		Model:     "coder-model",
+		BaseURL:   "https://portal.qwen.ai",
+	},
+})
 
-	response, err := client.Complete(context.Background(), "Hello, who are you?")
-	if err != nil {
-		fmt.Printf("Error getting completion: %v\n", err)
-		return
-	}
-	fmt.Printf("Response: %s\n", response)
-}
+client.Chat(...)
 ```
 
-## 配置选项
+---
 
-所有客户端都支持以下配置选项：
+## 🔌 Fully Supported Providers
 
-| 选项 | 描述 | 默认值 |
-|------|------|--------|
-| APIKey | LLM提供商的API密钥 | 无（必需，除非提供AuthToken） |
-| AuthToken | LLM提供商的认证令牌（替代APIKey） | 无 |
-| Model | 使用的模型名称 | 各提供商的默认模型 |
-| BaseURL | API请求的基础URL | 各提供商的默认URL |
-| Timeout | 请求超时时间 | 30秒（Ollama为60秒） |
-| MaxRetries | 最大重试次数 | 3 |
-| Temperature | 生成温度（0.0-1.0） | 0.7 |
-| MaxTokens | 最大生成令牌数 | 无限制 |
+*   **OpenAI** (`gpt-4o`, `o1`, `o3-mini`, etc.)
+*   **Anthropic** (`claude-3-7-sonnet`, `opus`, etc.)
+*   **DeepSeek** (`deepseek-chat`, `deepseek-reasoner`, etc.)
+*   **Alibaba Qwen** (Cloud Models & Portal Exclusive Gateways)
+*   **Ollama** (Running Open-Source Models Locally)
+*   **Azure OpenAI** (Microsoft Cloud Enterprise Deployment)
+*   **OpenAI-Compatible** (Any VLLM, LM Studio nodes, or proxies adhering to the OpenAI interface standard)
 
-## 环境变量支持
+## 🎯 Design Philosophy & Conventions
 
-库支持从环境变量获取API密钥，提高安全性：
+GoChat adheres to Go's philosophy of minimalism: The core interface `core.Client` has only two methods: `Chat` and `ChatStream`.
+All provider-specific customizations (like enabling search, setting thinking word limits, or injecting toolsets) are elegantly extended via **Functional Options** (`core.Option`), ensuring the main interface is never polluted.
 
-- 对于APIKey，会尝试从大写的环境变量中获取（例如，OpenAI的APIKey会尝试从`OPENAI_API_KEY`环境变量获取）
-- 对于AuthToken，会尝试从大写的环境变量中获取（例如，`OPENAI_AUTH_TOKEN`）
+## 📄 License
 
-## 错误处理
-
-库提供了结构化的错误处理，错误类型包括：
-
-- `ErrorTypeAPI`：API错误
-- `ErrorTypeNetwork`：网络错误
-- `ErrorTypeTimeout`：超时错误
-- `ErrorTypeValidation`：验证错误
-- `ErrorTypeUnknown`：未知错误
-
-## 重试机制
-
-库内置了智能重试机制：
-
-- 对于可重试的错误（如速率限制、超时、临时错误等）会自动重试
-- 使用指数退避策略，避免请求雪崩
-- 最大重试次数可通过配置设置
-
-## 贡献
-
-欢迎提交Issue和Pull Request来改进这个库。
-
-## 许可证
-
-MIT
+This project is open-sourced under the [MIT License](LICENSE). PRs are welcome as we build the strongest LLM infrastructure for the Go ecosystem!

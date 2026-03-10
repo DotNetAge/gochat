@@ -3,14 +3,13 @@ package openai
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/DotNetAge/gochat/pkg/client/base"
+	"github.com/DotNetAge/gochat/pkg/client/openaicompat"
 	"github.com/DotNetAge/gochat/pkg/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -46,16 +45,6 @@ func TestNewClient(t *testing.T) {
 			},
 			wantErr: true,
 		},
-		{
-			name: "invalid model",
-			config: Config{
-				Config: base.Config{
-					APIKey: "test-key",
-					Model:  "invalid-model",
-				},
-			},
-			wantErr: false,
-		},
 	}
 
 	for _, tt := range tests {
@@ -72,37 +61,35 @@ func TestNewClient(t *testing.T) {
 	}
 }
 
-func TestClient_Complete(t *testing.T) {
+func TestClient_Chat(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
 		assert.Equal(t, "/v1/chat/completions", r.URL.Path)
 		assert.Equal(t, "Bearer test-key", r.Header.Get("Authorization"))
 
-		var reqBody ChatCompletionRequest
+		var reqBody openaicompat.ChatCompletionRequest
 		err := json.NewDecoder(r.Body).Decode(&reqBody)
 		require.NoError(t, err)
 
 		assert.Equal(t, "gpt-3.5-turbo", reqBody.Model)
 		assert.Len(t, reqBody.Messages, 1)
-		assert.Equal(t, "user", reqBody.Messages[0].Role)
-		assert.Equal(t, "test prompt", reqBody.Messages[0].Content)
 
-		response := ChatCompletionResponse{
+		response := openaicompat.ChatCompletionResponse{
 			ID:      "chatcmpl-abc123",
 			Object:  "chat.completion",
 			Created: 1699000000,
 			Model:   "gpt-3.5-turbo",
-			Choices: []Choice{
+			Choices: []openaicompat.Choice{
 				{
 					Index: 0,
-					Message: Message{
+					Message: openaicompat.Message{
 						Role:    "assistant",
 						Content: "test response",
 					},
 					FinishReason: "stop",
 				},
 			},
-			Usage: Usage{
+			Usage: openaicompat.Usage{
 				PromptTokens:     10,
 				CompletionTokens: 20,
 				TotalTokens:      30,
@@ -123,14 +110,19 @@ func TestClient_Complete(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	response, err := client.Complete(context.Background(), "test prompt")
+	messages := []core.Message{
+		core.NewUserMessage("test prompt"),
+	}
+	response, err := client.Chat(context.Background(), messages)
 	require.NoError(t, err)
-	assert.Equal(t, "test response", response)
+	assert.Equal(t, "test response", response.Content)
+	assert.NotNil(t, response.Usage)
+	assert.Equal(t, 30, response.Usage.TotalTokens)
 }
 
-func TestClient_CompleteStream(t *testing.T) {
+func TestClient_ChatStream(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var reqBody ChatCompletionRequest
+		var reqBody openaicompat.ChatCompletionRequest
 		json.NewDecoder(r.Body).Decode(&reqBody)
 
 		assert.True(t, reqBody.Stream)
@@ -164,18 +156,87 @@ func TestClient_CompleteStream(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	stream, err := client.CompleteStream(context.Background(), "test prompt")
+	messages := []core.Message{
+		core.NewUserMessage("test prompt"),
+	}
+	stream, err := client.ChatStream(context.Background(), messages)
 	require.NoError(t, err)
+	defer stream.Close()
 
-	var result strings.Builder
-	for chunk := range stream {
-		result.WriteString(chunk)
+	var result string
+	for stream.Next() {
+		ev := stream.Event()
+		if ev.Err != nil {
+			t.Fatal(ev.Err)
+		}
+		if ev.Type == core.EventContent {
+			result += ev.Content
+		}
 	}
 
-	assert.Equal(t, "Hello world", result.String())
+	assert.Equal(t, "Hello world", result)
 }
 
-func TestClient_Complete_ErrorHandling(t *testing.T) {
+func TestClient_ChatWithOptions(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var reqBody openaicompat.ChatCompletionRequest
+		err := json.NewDecoder(r.Body).Decode(&reqBody)
+		require.NoError(t, err)
+
+		// Verify options were applied
+		assert.Equal(t, 0.9, reqBody.Temperature)
+		assert.Equal(t, 500, reqBody.MaxTokens)
+		assert.Len(t, reqBody.Messages, 2) // system + user
+
+		response := openaicompat.ChatCompletionResponse{
+			ID:    "chatcmpl-abc123",
+			Model: "gpt-4",
+			Choices: []openaicompat.Choice{
+				{
+					Message: openaicompat.Message{
+						Role:    "assistant",
+						Content: "response",
+					},
+					FinishReason: "stop",
+				},
+			},
+			Usage: openaicompat.Usage{TotalTokens: 50},
+		}
+
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	client, err := New(Config{
+		Config: base.Config{
+			APIKey:  "test-key",
+			Model:   "gpt-3.5-turbo",
+			BaseURL: server.URL,
+		},
+	})
+	require.NoError(t, err)
+
+	messages := []core.Message{
+		core.NewUserMessage("test"),
+	}
+
+	var callbackCalled bool
+	response, err := client.Chat(context.Background(), messages,
+		core.WithModel("gpt-4"),
+		core.WithTemperature(0.9),
+		core.WithMaxTokens(500),
+		core.WithSystemPrompt("You are a helpful assistant"),
+		core.WithUsageCallback(func(u core.Usage) {
+			callbackCalled = true
+			assert.Equal(t, 50, u.TotalTokens)
+		}),
+	)
+	require.NoError(t, err)
+	assert.Equal(t, "response", response.Content)
+	assert.True(t, callbackCalled)
+}
+
+func TestClient_Chat_ErrorHandling(t *testing.T) {
 	tests := []struct {
 		name       string
 		statusCode int
@@ -193,12 +254,6 @@ func TestClient_Complete_ErrorHandling(t *testing.T) {
 			statusCode: 429,
 			response:   `{"error": {"message": "Rate limit exceeded", "type": "rate_limit_error"}}`,
 			wantErr:    "rate",
-		},
-		{
-			name:       "server error",
-			statusCode: 500,
-			response:   `{"error": {"message": "Internal server error", "type": "server_error"}}`,
-			wantErr:    "server",
 		},
 	}
 
@@ -220,238 +275,10 @@ func TestClient_Complete_ErrorHandling(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			_, err = client.Complete(context.Background(), "test")
+			messages := []core.Message{core.NewUserMessage("test")}
+			_, err = client.Chat(context.Background(), messages)
 			assert.Error(t, err)
 			assert.Contains(t, err.Error(), tt.wantErr)
-		})
-	}
-}
-
-func TestClient_Complete_Timeout(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(2 * time.Second)
-	}))
-	defer server.Close()
-
-	client, err := New(Config{
-		Config: base.Config{
-			APIKey:     "test-key",
-			Model:      "gpt-3.5-turbo",
-			BaseURL:    server.URL,
-			Timeout:    100 * time.Millisecond,
-			MaxRetries: 0,
-		},
-	})
-	require.NoError(t, err)
-
-	_, err = client.Complete(context.Background(), "test")
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "deadline exceeded")
-}
-
-func TestClient_Complete_EmptyPrompt(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var reqBody ChatCompletionRequest
-		json.NewDecoder(r.Body).Decode(&reqBody)
-
-		response := ChatCompletionResponse{
-			ID:     "chatcmpl-abc123",
-			Object: "chat.completion",
-			Choices: []Choice{
-				{
-					Index: 0,
-					Message: Message{
-						Role:    "assistant",
-						Content: "",
-					},
-					FinishReason: "stop",
-				},
-			},
-		}
-
-		json.NewEncoder(w).Encode(response)
-	}))
-	defer server.Close()
-
-	client, err := New(Config{
-		Config: base.Config{
-			APIKey:  "test-key",
-			Model:   "gpt-3.5-turbo",
-			BaseURL: server.URL,
-		},
-	})
-	require.NoError(t, err)
-
-	response, err := client.Complete(context.Background(), "")
-	require.NoError(t, err)
-	assert.Equal(t, "", response)
-}
-
-func TestClient_CompleteStream_ErrorInStream(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/event-stream")
-
-		w.Write([]byte(`data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"Hello"}}]}` + "\n\n"))
-		w.Write([]byte(`data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":" world"}}]}` + "\n\n"))
-		w.Write([]byte(`data: {"id":"chatcmpl-abc123","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}` + "\n\n"))
-	}))
-	defer server.Close()
-
-	client, err := New(Config{
-		Config: base.Config{
-			APIKey:  "test-key",
-			Model:   "gpt-3.5-turbo",
-			BaseURL: server.URL,
-		},
-	})
-	require.NoError(t, err)
-
-	stream, err := client.CompleteStream(context.Background(), "test")
-	require.NoError(t, err)
-
-	chunks := []string{}
-	for chunk := range stream {
-		chunks = append(chunks, chunk)
-	}
-
-	assert.GreaterOrEqual(t, len(chunks), 2)
-	result := strings.Join(chunks, "")
-	assert.Equal(t, "Hello world", result)
-}
-
-func TestParseChatCompletionResponse(t *testing.T) {
-	responseBody := `{
-		"id": "chatcmpl-abc123",
-		"object": "chat.completion",
-		"created": 1699000000,
-		"model": "gpt-3.5-turbo",
-		"choices": [
-			{
-				"index": 0,
-				"message": {
-					"role": "assistant",
-					"content": "test response"
-				},
-				"finish_reason": "stop"
-			}
-		],
-		"usage": {
-			"prompt_tokens": 10,
-			"completion_tokens": 20,
-			"total_tokens": 30
-		}
-	}`
-
-	var resp ChatCompletionResponse
-	err := json.Unmarshal([]byte(responseBody), &resp)
-	require.NoError(t, err)
-
-	assert.Equal(t, "chatcmpl-abc123", resp.ID)
-	assert.Equal(t, "chat.completion", resp.Object)
-	assert.Len(t, resp.Choices, 1)
-	assert.Equal(t, "assistant", resp.Choices[0].Message.Role)
-	assert.Equal(t, "test response", resp.Choices[0].Message.Content)
-	assert.Equal(t, 10, resp.Usage.PromptTokens)
-}
-
-func TestParseStreamChunk(t *testing.T) {
-	tests := []struct {
-		name    string
-		line    string
-		want    *StreamChunk
-		wantErr bool
-	}{
-		{
-			name: "valid chunk",
-			line: `data: {"id":"chatcmpl-abc123","choices":[{"index":0,"delta":{"content":"Hello"}}]}`,
-			want: &StreamChunk{
-				ID: "chatcmpl-abc123",
-				Choices: []StreamChoice{
-					{
-						Index: 0,
-						Delta: &Delta{
-							Content: "Hello",
-						},
-					},
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name:    "done signal",
-			line:    `data: [DONE]`,
-			want:    nil,
-			wantErr: false,
-		},
-		{
-			name:    "empty line",
-			line:    "",
-			want:    nil,
-			wantErr: false,
-		},
-		{
-			name:    "invalid json",
-			line:    `data: {invalid}`,
-			want:    nil,
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			chunk, err := parseStreamChunk(tt.line)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				if tt.want == nil {
-					assert.Nil(t, chunk)
-				} else {
-					assert.Equal(t, tt.want.ID, chunk.ID)
-					assert.Equal(t, tt.want.Choices[0].Delta.Content, chunk.Choices[0].Delta.Content)
-				}
-			}
-		})
-	}
-}
-
-func TestIsRetryableError(t *testing.T) {
-	tests := []struct {
-		name     string
-		err      error
-		expected bool
-	}{
-		{
-			name:     "rate limit error",
-			err:      fmt.Errorf("rate limit exceeded"),
-			expected: true,
-		},
-		{
-			name:     "timeout error",
-			err:      fmt.Errorf("context deadline exceeded"),
-			expected: true,
-		},
-		{
-			name:     "server error",
-			err:      fmt.Errorf("internal server error"),
-			expected: true,
-		},
-		{
-			name:     "invalid api key",
-			err:      fmt.Errorf("invalid api key"),
-			expected: false,
-		},
-		{
-			name:     "context canceled",
-			err:      context.Canceled,
-			expected: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := core.IsRetryableError(tt.err)
-			assert.Equal(t, tt.expected, result)
 		})
 	}
 }

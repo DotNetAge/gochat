@@ -4,11 +4,23 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
 	"github.com/DotNetAge/gochat/pkg/core"
+)
+
+// Undocumented Qwen Portal Constants discovered via testing
+const (
+	// QwenPortalModelCoder is the model used for coding tasks in the portal.
+	QwenPortalModelCoder = "coder-model"
+	
+	// QwenPortalModelVision is the multimodal model used in the portal.
+	QwenPortalModelVision = "vision-model"
+
+	// QwenPortalDailyLimit represents the undocumented daily request limit.
+	QwenPortalDailyLimit = 2000
 )
 
 // QwenProvider Qwen 提供商
@@ -21,7 +33,7 @@ type QwenProvider struct {
 // NewQwenProvider 创建 Qwen 提供商
 func NewQwenProvider() *QwenProvider {
 	return &QwenProvider{
-		HTTPClient:  &http.Client{Timeout: 10 * time.Second},
+		HTTPClient:  &http.Client{Timeout: 30 * time.Second},
 		TokenHelper: &core.TokenHelper{},
 		PKCEHelper:  &core.PKCEHelper{},
 	}
@@ -57,7 +69,11 @@ func (p *QwenProvider) RequestDeviceCode() (*QwenDeviceAuthorization, string, er
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("x-request-id", p.PKCEHelper.GenerateUUID())
+	requestID, err := p.PKCEHelper.GenerateUUID()
+	if err != nil {
+		return nil, "", err
+	}
+	req.Header.Set("x-request-id", requestID)
 
 	resp, err := p.HTTPClient.Do(req)
 	if err != nil {
@@ -65,7 +81,7 @@ func (p *QwenProvider) RequestDeviceCode() (*QwenDeviceAuthorization, string, er
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, "", err
 	}
@@ -103,7 +119,7 @@ func (p *QwenProvider) PollForToken(deviceCode, verifier string) (status string,
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "error", nil, false, err.Error()
 	}
@@ -224,7 +240,7 @@ func (p *QwenProvider) RefreshToken(refreshToken string) (*core.OAuthToken, erro
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}

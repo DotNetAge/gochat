@@ -1,101 +1,51 @@
 package compatible
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
+	"net/http"
 
 	"github.com/DotNetAge/gochat/pkg/client/base"
+	"github.com/DotNetAge/gochat/pkg/client/openaicompat"
 	"github.com/DotNetAge/gochat/pkg/core"
 )
 
-// Config configures the OpenAI-compatible client
+// Config defines configuration for the Compatible client.
+//
+// Embed base.Config to inherit common settings like APIKey, Model, Temperature, etc.
+//
+// Example:
+//
+//	config := compatible.Config{
+//	    Config: base.Config{
+//	        APIKey:      "sk-...",
+//	        Model:       "gpt-4",
+//	        Temperature: 0.7,
+//	        MaxTokens:   1000,
+//	    },
+//	}
+//	client, err := compatible.New(config)
 type Config struct {
 	base.Config
 }
 
-// Client implements an LLM client for OpenAI-compatible APIs
+// Client is an Compatible LLM client.
+//
+// It implements the core.Client interface and provides access to Compatible's
+// chat completion API, including GPT-3.5, GPT-4, and other models.
+//
+// The client handles authentication, retries, error handling, and streaming
+// automatically. It supports all Compatible features including tool calling,
+// multimodal inputs, and extended thinking (for o1/o3 models).
 type Client struct {
 	base *base.Client
 }
 
-// Message represents a message in the conversation
-type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
-}
-
-// ChatCompletionRequest represents a chat completion request
-type ChatCompletionRequest struct {
-	Model       string    `json:"model"`
-	Messages    []Message `json:"messages"`
-	Temperature float64   `json:"temperature,omitempty"`
-	MaxTokens   int       `json:"max_tokens,omitempty"`
-	Stream      bool      `json:"stream,omitempty"`
-}
-
-// Choice represents a choice in the chat completion response
-type Choice struct {
-	Index        int     `json:"index"`
-	Message      Message `json:"message"`
-	FinishReason string  `json:"finish_reason"`
-}
-
-// ChatCompletionResponse represents a chat completion response
-type ChatCompletionResponse struct {
-	ID      string   `json:"id"`
-	Object  string   `json:"object"`
-	Created int64    `json:"created"`
-	Model   string   `json:"model"`
-	Choices []Choice `json:"choices"`
-	Usage   Usage    `json:"usage"`
-}
-
-// Usage represents usage information
-type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
-}
-
-// Delta represents a delta in the streaming response
-type Delta struct {
-	Content string `json:"content,omitempty"`
-}
-
-// StreamChoice represents a choice in the streaming response
-type StreamChoice struct {
-	Index        int    `json:"index"`
-	Delta        *Delta `json:"delta,omitempty"`
-	FinishReason string `json:"finish_reason,omitempty"`
-}
-
-// StreamChunk represents a chunk in the streaming response
-type StreamChunk struct {
-	ID      string         `json:"id"`
-	Object  string         `json:"object"`
-	Created int64          `json:"created"`
-	Model   string         `json:"model"`
-	Choices []StreamChoice `json:"choices"`
-}
-
-// Error represents an error response
-type Error struct {
-	Message string `json:"message"`
-	Type    string `json:"type"`
-}
-
-// ErrorResponse represents an error response
-type ErrorResponse struct {
-	Error Error `json:"error"`
-}
-
-// New creates a new OpenAI-compatible client
+// New creates a new Compatible client
 func New(config Config) (*Client, error) {
 	if config.APIKey == "" && config.AuthToken == "" {
 		return nil, core.NewValidationError("either api key or auth token is required", nil)
@@ -106,7 +56,7 @@ func New(config Config) (*Client, error) {
 	}
 
 	if config.BaseURL == "" {
-		config.BaseURL = "https://api.openai.com"
+		config.BaseURL = "https://api.compatible.com"
 	}
 
 	baseClient := base.New(config.Config)
@@ -116,12 +66,13 @@ func New(config Config) (*Client, error) {
 	}, nil
 }
 
-// Complete generates a completion for the given prompt
-func (c *Client) Complete(ctx context.Context, prompt string) (string, error) {
-	var response *ChatCompletionResponse
+// Chat performs a non-streaming chat completion
+func (c *Client) Chat(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.Response, error) {
+	options := core.ApplyOptions(opts...)
 
+	var response *core.Response
 	err := c.base.Retry(ctx, func() error {
-		resp, err := c.doComplete(ctx, prompt, false)
+		resp, err := c.doChat(ctx, messages, options, false)
 		if err != nil {
 			return err
 		}
@@ -130,29 +81,40 @@ func (c *Client) Complete(ctx context.Context, prompt string) (string, error) {
 	})
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	if len(response.Choices) > 0 {
-		return response.Choices[0].Message.Content, nil
+	// Call usage callback if provided
+	if options.UsageCallback != nil && response.Usage != nil {
+		options.UsageCallback(*response.Usage)
 	}
 
-	return "", nil
+	return response, nil
 }
 
-// CompleteStream generates a completion for the given prompt and returns a channel for streaming responses
-func (c *Client) CompleteStream(ctx context.Context, prompt string) (<-chan string, error) {
-	reqBody := ChatCompletionRequest{
-		Model: c.base.Config().Model,
-		Messages: []Message{
-			{
-				Role:    "user",
-				Content: prompt,
-			},
-		},
-		Temperature: c.base.Config().Temperature,
-		MaxTokens:   c.base.Config().MaxTokens,
+// ChatStream performs a streaming chat completion
+func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.Stream, error) {
+	options := core.ApplyOptions(opts...)
+
+	// Build request
+	model := c.resolveModel(options)
+	reqBody := openaicompat.ChatCompletionRequest{
+		Model:       model,
+		Messages:    openaicompat.MessagesToWire(messages, options.SystemPrompt),
+		Temperature: c.resolveTemperature(options),
+		MaxTokens:   c.resolveMaxTokens(options),
+		TopP:        c.resolveTopP(options),
+		Stop:        options.Stop,
 		Stream:      true,
+		EnableSearch: options.EnableSearch,
+	}
+
+	if options.Thinking {
+		reqBody.ReasoningEffort = "high"
+	}
+
+	if len(options.Tools) > 0 {
+		reqBody.Tools = openaicompat.ToolsToWire(options.Tools)
 	}
 
 	jsonData, err := json.Marshal(reqBody)
@@ -160,7 +122,11 @@ func (c *Client) CompleteStream(ctx context.Context, prompt string) (<-chan stri
 		return nil, core.NewValidationError("failed to marshal request", err)
 	}
 
-	url := fmt.Sprintf("%s/v1/chat/completions", c.base.Config().BaseURL)
+	baseURL := strings.TrimSuffix(c.base.Config().BaseURL, "/")
+	if !strings.HasSuffix(baseURL, "/v1") {
+		baseURL = baseURL + "/v1"
+	}
+	url := fmt.Sprintf("%s/chat/completions", baseURL)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
 	if err != nil {
 		return nil, core.NewNetworkError("failed to create request", err)
@@ -187,7 +153,7 @@ func (c *Client) CompleteStream(ctx context.Context, prompt string) (<-chan stri
 			return nil, core.NewNetworkError("failed to read response", err)
 		}
 
-		var errResp ErrorResponse
+		var errResp openaicompat.ErrorResponse
 		if err := json.Unmarshal(body, &errResp); err == nil {
 			return nil, core.NewAPIError(fmt.Sprintf("%s: %s", errResp.Error.Type, errResp.Error.Message), nil)
 		}
@@ -195,67 +161,49 @@ func (c *Client) CompleteStream(ctx context.Context, prompt string) (<-chan stri
 		return nil, core.NewAPIError(fmt.Sprintf("request failed with status %d: %s", resp.StatusCode, string(body)), nil)
 	}
 
-	ch := make(chan string, 10)
+	ch := make(chan core.StreamEvent, 10)
 
 	go func() {
 		defer close(ch)
 		defer resp.Body.Close()
 
-		scanner := bufio.NewScanner(resp.Body)
-		for scanner.Scan() {
+		chunkCh := openaicompat.ParseSSEStream(resp.Body)
+		for chunk := range chunkCh {
 			select {
 			case <-ctx.Done():
+				ch <- core.StreamEvent{Type: core.EventError, Err: ctx.Err()}
 				return
 			default:
 			}
 
-			line := scanner.Text()
-			if line == "" {
-				continue
-			}
-
-			chunk, err := parseStreamChunk(line)
-			if err != nil {
-				select {
-				case ch <- "ERROR: " + err.Error():
-				case <-ctx.Done():
-				}
-				return
-			}
-
-			if chunk != nil && len(chunk.Choices) > 0 && chunk.Choices[0].Delta != nil {
-				select {
-				case ch <- chunk.Choices[0].Delta.Content:
-				case <-ctx.Done():
-					return
-				}
-			}
-		}
-
-		if err := scanner.Err(); err != nil {
-			select {
-			case ch <- "ERROR: " + err.Error():
-			case <-ctx.Done():
-			}
+			event := openaicompat.StreamChunkToEvent(chunk)
+			ch <- event
 		}
 	}()
 
-	return ch, nil
+	return core.NewStream(ch, resp.Body), nil
 }
 
-// doComplete performs a completion request
-func (c *Client) doComplete(ctx context.Context, prompt string, stream bool) (*ChatCompletionResponse, error) {
-	reqBody := ChatCompletionRequest{
-		Model: c.base.Config().Model,
-		Messages: []Message{
-			{
-				Role:    "user",
-				Content: prompt,
-			},
-		},
-		Temperature: c.base.Config().Temperature,
-		MaxTokens:   c.base.Config().MaxTokens,
+// doChat performs the actual chat request
+func (c *Client) doChat(ctx context.Context, messages []core.Message, options core.Options, stream bool) (*core.Response, error) {
+	model := c.resolveModel(options)
+	reqBody := openaicompat.ChatCompletionRequest{
+		Model:       model,
+		Messages:    openaicompat.MessagesToWire(messages, options.SystemPrompt),
+		Temperature: c.resolveTemperature(options),
+		MaxTokens:   c.resolveMaxTokens(options),
+		TopP:        c.resolveTopP(options),
+		Stop:        options.Stop,
 		Stream:      stream,
+		EnableSearch: options.EnableSearch,
+	}
+
+	if options.Thinking {
+		reqBody.ReasoningEffort = "high"
+	}
+
+	if len(options.Tools) > 0 {
+		reqBody.Tools = openaicompat.ToolsToWire(options.Tools)
 	}
 
 	jsonData, err := json.Marshal(reqBody)
@@ -263,7 +211,11 @@ func (c *Client) doComplete(ctx context.Context, prompt string, stream bool) (*C
 		return nil, core.NewValidationError("failed to marshal request", err)
 	}
 
-	url := fmt.Sprintf("%s/v1/chat/completions", c.base.Config().BaseURL)
+	baseURL := strings.TrimSuffix(c.base.Config().BaseURL, "/")
+	if !strings.HasSuffix(baseURL, "/v1") {
+		baseURL = baseURL + "/v1"
+	}
+	url := fmt.Sprintf("%s/chat/completions", baseURL)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
 	if err != nil {
 		return nil, core.NewNetworkError("failed to create request", err)
@@ -281,53 +233,60 @@ func (c *Client) doComplete(ctx context.Context, prompt string, stream bool) (*C
 	if err != nil {
 		return nil, core.NewNetworkError("failed to send request", err)
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		defer resp.Body.Close()
-
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, core.NewNetworkError("failed to read response", err)
 		}
 
-		var errResp ErrorResponse
+		var errResp openaicompat.ErrorResponse
 		if err := json.Unmarshal(body, &errResp); err == nil {
 			return nil, core.NewAPIError(fmt.Sprintf("%s: %s", errResp.Error.Type, errResp.Error.Message), nil)
 		}
 
 		return nil, core.NewAPIError(fmt.Sprintf("request failed with status %d: %s", resp.StatusCode, string(body)), nil)
 	}
-
-	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, core.NewNetworkError("failed to read response", err)
 	}
 
-	var respData ChatCompletionResponse
+	var respData openaicompat.ChatCompletionResponse
 	if err := json.Unmarshal(body, &respData); err != nil {
 		return nil, core.NewValidationError("failed to unmarshal response", err)
 	}
 
-	return &respData, nil
+	return openaicompat.ResponseFromWire(&respData), nil
 }
 
-// parseStreamChunk parses a stream chunk
-func parseStreamChunk(line string) (*StreamChunk, error) {
-	if !strings.HasPrefix(line, "data: ") {
-		return nil, nil
+// Helper methods to resolve options
+func (c *Client) resolveModel(opts core.Options) string {
+	if opts.Model != "" {
+		return opts.Model
 	}
+	return c.base.Config().Model
+}
 
-	data := strings.TrimPrefix(line, "data: ")
-	if data == "[DONE]" {
-		return nil, nil
+func (c *Client) resolveTemperature(opts core.Options) float64 {
+	if opts.Temperature != nil {
+		return *opts.Temperature
 	}
+	return c.base.Config().Temperature
+}
 
-	var chunk StreamChunk
-	if err := json.Unmarshal([]byte(data), &chunk); err != nil {
-		return nil, core.NewValidationError("failed to unmarshal chunk", err)
+func (c *Client) resolveMaxTokens(opts core.Options) int {
+	if opts.MaxTokens != nil {
+		return *opts.MaxTokens
 	}
+	return c.base.Config().MaxTokens
+}
 
-	return &chunk, nil
+func (c *Client) resolveTopP(opts core.Options) float64 {
+	if opts.TopP != nil {
+		return *opts.TopP
+	}
+	return 0 // 0 means not set
 }
