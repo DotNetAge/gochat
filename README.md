@@ -18,6 +18,7 @@ GoChat is a **modern, enterprise-ready Go client SDK for Large Language Models (
 
 </p>
 </div>
+
 ---
 
 ## ✨ New & Killer Features
