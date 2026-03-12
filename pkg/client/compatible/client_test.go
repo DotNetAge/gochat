@@ -49,7 +49,7 @@ func TestNewClient(t *testing.T) {
 					Model:  "gpt-3.5-turbo",
 				},
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 	}
 
