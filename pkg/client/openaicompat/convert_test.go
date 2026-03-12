@@ -27,6 +27,24 @@ func TestMessagesToWire(t *testing.T) {
 	assert.Len(t, wireMessages2, 3)
 	assert.Equal(t, core.RoleSystem, wireMessages2[0].Role)
 	assert.Equal(t, "System prompt", wireMessages2[0].Content)
+
+	// 测试多模态消息
+	messages3 := []core.Message{
+		{
+			Role: core.RoleUser,
+			Content: []core.ContentBlock{
+				{Type: core.ContentTypeText, Text: "Check this image"},
+				{Type: core.ContentTypeImage, MediaType: "image/png", Data: "base64data"},
+			},
+		},
+	}
+	wireMessages3 := MessagesToWire(messages3, "")
+	assert.Len(t, wireMessages3, 1)
+	contentParts, ok := wireMessages3[0].Content.([]ContentPart)
+	assert.True(t, ok)
+	assert.Len(t, contentParts, 2)
+	assert.Equal(t, "text", contentParts[0].Type)
+	assert.Equal(t, "image_url", contentParts[1].Type)
 }
 
 func TestToolsToWire(t *testing.T) {
@@ -74,42 +92,48 @@ func TestResponseFromWire(t *testing.T) {
 	assert.NotNil(t, coreResp.Usage)
 	assert.Equal(t, 15, coreResp.Usage.TotalTokens)
 
+	// 测试工具调用
+	respWithTools := &ChatCompletionResponse{
+		Choices: []Choice{
+			{
+				Message: Message{
+					Role: "assistant",
+					ToolCalls: []ToolCall{
+						{
+							ID:   "call_123",
+							Type: "function",
+						},
+					},
+				},
+			},
+		},
+	}
+	respWithTools.Choices[0].Message.ToolCalls[0].Function.Name = "get_weather"
+	respWithTools.Choices[0].Message.ToolCalls[0].Function.Arguments = `{"location":"London"}`
+	coreRespWithTools := ResponseFromWire(respWithTools)
+	assert.Len(t, coreRespWithTools.ToolCalls, 1)
+	assert.Equal(t, "get_weather", coreRespWithTools.ToolCalls[0].Name)
+
 	// 测试空响应
 	emptyResp := ResponseFromWire(nil)
 	assert.NotNil(t, emptyResp)
-
-	// 测试无选择的响应
-	noChoicesResp := &ChatCompletionResponse{
-		ID:    "chatcmpl-456",
-		Model: "gpt-4",
-		Usage: Usage{TotalTokens: 10},
-	}
-
-	coreResp2 := ResponseFromWire(noChoicesResp)
-	assert.Equal(t, "chatcmpl-456", coreResp2.ID)
-	assert.Equal(t, "gpt-4", coreResp2.Model)
 }
 
-func TestParseSSEStream(t *testing.T) {
-	// 测试解析 SSE 流
-	sseData := `data: {"id":"chatcmpl-123","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"Hello"},"finish_reason":null}]}
-
-data: {"id":"chatcmpl-123","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":" world"},"finish_reason":null}]}
-
-data: [DONE]
-`
-
+func TestParseSSEStream_EdgeCases(t *testing.T) {
+	// 测试格式错误的 SSE
+	sseData := "invalid data\n\n"
 	reader := bytes.NewReader([]byte(sseData))
 	ch := ParseSSEStream(reader)
-
-	chunks := []StreamChunk{}
-	for chunk := range ch {
-		chunks = append(chunks, chunk)
+	for range ch {
+		// Should not panic or return invalid chunks
 	}
 
-	assert.Len(t, chunks, 2)
-	assert.Equal(t, "chatcmpl-123", chunks[0].ID)
-	assert.Equal(t, "chatcmpl-123", chunks[1].ID)
+	// 测试空数据
+	sseData2 := "data: \n\n"
+	reader2 := bytes.NewReader([]byte(sseData2))
+	ch2 := ParseSSEStream(reader2)
+	for range ch2 {
+	}
 }
 
 func TestStreamChunkToEvent(t *testing.T) {

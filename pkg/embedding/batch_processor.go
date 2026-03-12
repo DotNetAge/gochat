@@ -5,6 +5,7 @@ package embedding
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 )
 
 // BatchOptions contains configuration options for batch processing.
@@ -74,57 +75,50 @@ func (bp *BatchProcessor) ProcessWithProgress(
 		return [][]float32{}, nil
 	}
 
-	// Initialize result
 	results := make([][]float32, total)
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-	var processErr error
+	var (
+		processedCount int32
+		once           sync.Once
+		processErr     error
+		wg             sync.WaitGroup
+	)
 
-	// Semaphore for concurrent batches
+	// Create a derived context that we can cancel on first error
+	innerCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	sem := make(chan struct{}, bp.options.MaxConcurrent)
 
-	// Process in batches
 	for i := 0; i < total; i += bp.options.MaxBatchSize {
-		start := i
 		end := i + bp.options.MaxBatchSize
 		if end > total {
 			end = total
 		}
 
-		batch := texts[start:end]
-		batchIndices := make([]int, end-start)
-		for j := range batchIndices {
-			batchIndices[j] = start + j
-		}
-
 		wg.Add(1)
-		go func(batchTexts []string, indices []int) {
+		go func(startIdx, endIdx int) {
 			defer wg.Done()
 
-			// Acquire semaphore
+			// Check if already cancelled
 			select {
+			case <-innerCtx.Done():
+				return
 			case sem <- struct{}{}:
 				defer func() { <-sem }()
-			case <-ctx.Done():
-				mu.Lock()
-				if processErr == nil {
-					processErr = ctx.Err()
-				}
-				mu.Unlock()
-				return
 			}
 
-			// Check cache first
-			cachedIndices := make([]int, 0)
-			cachedEmbeddings := make([][]float32, 0)
-			uncachedTexts := make([]string, 0)
-			uncachedIndices := make([]int, 0)
+			batchTexts := texts[startIdx:endIdx]
+			batchSize := endIdx - startIdx
+			batchResults := make([][]float32, batchSize)
+
+			// 1. Check cache (Read Lock)
+			uncachedTexts := make([]string, 0, batchSize)
+			uncachedIndices := make([]int, 0, batchSize)
 
 			bp.cacheMutex.RLock()
 			for j, text := range batchTexts {
 				if embedding, ok := bp.cache[text]; ok {
-					cachedIndices = append(cachedIndices, j)
-					cachedEmbeddings = append(cachedEmbeddings, embedding)
+					batchResults[j] = embedding
 				} else {
 					uncachedTexts = append(uncachedTexts, text)
 					uncachedIndices = append(uncachedIndices, j)
@@ -132,65 +126,56 @@ func (bp *BatchProcessor) ProcessWithProgress(
 			}
 			bp.cacheMutex.RUnlock()
 
-			// Process uncached texts
-			var uncachedEmbeddings [][]float32
-			var err error
-
+			// 2. Process uncached texts
 			if len(uncachedTexts) > 0 {
-				uncachedEmbeddings, err = bp.provider.Embed(ctx, uncachedTexts)
+				embeddings, err := bp.provider.Embed(innerCtx, uncachedTexts)
 				if err != nil {
-					if callback != nil {
-						callback(0, total, err)
-					}
-					mu.Lock()
-					if processErr == nil {
+					once.Do(func() {
 						processErr = err
+						cancel()
+					})
+					if callback != nil {
+						callback(int(atomic.LoadInt32(&processedCount)), total, err)
 					}
-					mu.Unlock()
 					return
 				}
 
-				// Update cache
+				// Update cache and results (Write Lock)
 				bp.cacheMutex.Lock()
 				for j, text := range uncachedTexts {
-					bp.cache[text] = uncachedEmbeddings[j]
+					bp.cache[text] = embeddings[j]
+					batchResults[uncachedIndices[j]] = embeddings[j]
 				}
 				bp.cacheMutex.Unlock()
 			}
 
-			// Combine results
-			batchResults := make([][]float32, len(batchTexts))
-
-			// Fill cached results
-			for j, idx := range cachedIndices {
-				batchResults[idx] = cachedEmbeddings[j]
+			// 3. Fill into final result slice (Direct access as slices are pre-allocated and indices are unique)
+			for j := 0; j < batchSize; j++ {
+				results[startIdx+j] = batchResults[j]
 			}
 
-			// Fill uncached results
-			for j, idx := range uncachedIndices {
-				batchResults[idx] = uncachedEmbeddings[j]
-			}
-
-			// Update final results
-			mu.Lock()
-			for j, idx := range indices {
-				results[idx] = batchResults[j]
-			}
-			mu.Unlock()
-
-			// Update progress
+			// 4. Update progress
+			newProcessed := atomic.AddInt32(&processedCount, int32(batchSize))
 			if callback != nil {
-				processed := end
-				if processed > total {
-					processed = total
-				}
-				if !callback(processed, total, nil) {
+				if !callback(int(newProcessed), total, nil) {
+					// Signal other goroutines to stop via context
+					cancel()
 					return
 				}
 			}
-		}(batch, batchIndices)
+		}(i, end)
 	}
 
 	wg.Wait()
-	return results, processErr
+
+	if processErr != nil {
+		return nil, processErr
+	}
+	// Final check for external cancellation
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	return results, nil
 }
+

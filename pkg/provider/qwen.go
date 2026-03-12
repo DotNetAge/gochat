@@ -25,17 +25,21 @@ const (
 
 // QwenProvider Qwen 提供商
 type QwenProvider struct {
-	HTTPClient  *http.Client
-	TokenHelper *core.TokenHelper
-	PKCEHelper  *core.PKCEHelper
+	HTTPClient    *http.Client
+	TokenHelper   *core.TokenHelper
+	PKCEHelper    *core.PKCEHelper
+	DeviceCodeURL string // For testing override
+	TokenURL      string // For testing override
 }
 
 // NewQwenProvider 创建 Qwen 提供商
 func NewQwenProvider() *QwenProvider {
 	return &QwenProvider{
-		HTTPClient:  &http.Client{Timeout: 30 * time.Second},
-		TokenHelper: &core.TokenHelper{},
-		PKCEHelper:  &core.PKCEHelper{},
+		HTTPClient:    &http.Client{Timeout: 30 * time.Second},
+		TokenHelper:   &core.TokenHelper{},
+		PKCEHelper:    &core.PKCEHelper{},
+		DeviceCodeURL: "https://chat.qwen.ai/api/v1/oauth2/device/code",
+		TokenURL:      "https://chat.qwen.ai/api/v1/oauth2/token",
 	}
 }
 
@@ -63,7 +67,7 @@ func (p *QwenProvider) RequestDeviceCode() (*QwenDeviceAuthorization, string, er
 
 	requestBody := "client_id=f0304373b74a44d2b584a3fb70ca9e56&scope=openid%20profile%20email%20model.completion&code_challenge=" + challenge + "&code_challenge_method=S256"
 
-	req, err := http.NewRequest("POST", "https://chat.qwen.ai/api/v1/oauth2/device/code", bytes.NewBufferString(requestBody))
+	req, err := http.NewRequest("POST", p.DeviceCodeURL, bytes.NewBufferString(requestBody))
 	if err != nil {
 		return nil, "", err
 	}
@@ -106,7 +110,7 @@ func (p *QwenProvider) RequestDeviceCode() (*QwenDeviceAuthorization, string, er
 func (p *QwenProvider) PollForToken(deviceCode, verifier string) (status string, token *core.OAuthToken, slowDown bool, errorMsg string) {
 	requestBody := "grant_type=urn:ietf:params:oauth:grant-type:device_code&client_id=f0304373b74a44d2b584a3fb70ca9e56&device_code=" + deviceCode + "&code_verifier=" + verifier
 
-	req, err := http.NewRequest("POST", "https://chat.qwen.ai/api/v1/oauth2/token", bytes.NewBufferString(requestBody))
+	req, err := http.NewRequest("POST", p.TokenURL, bytes.NewBufferString(requestBody))
 	if err != nil {
 		return "error", nil, false, err.Error()
 	}
@@ -227,7 +231,7 @@ func (p *QwenProvider) Authenticate() (*core.OAuthToken, error) {
 func (p *QwenProvider) RefreshToken(refreshToken string) (*core.OAuthToken, error) {
 	requestBody := "grant_type=refresh_token&client_id=f0304373b74a44d2b584a3fb70ca9e56&refresh_token=" + refreshToken
 
-	req, err := http.NewRequest("POST", "https://chat.qwen.ai/api/v1/oauth2/token", bytes.NewBufferString(requestBody))
+	req, err := http.NewRequest("POST", p.TokenURL, bytes.NewBufferString(requestBody))
 	if err != nil {
 		return nil, err
 	}

@@ -123,11 +123,48 @@ func (p *Provider) processBatch(ctx context.Context, texts []string) ([][]float3
 	}
 
 	// Extract embeddings from output
-	embeddings, ok := outputs["last_hidden_state"].([][]float32)
+	// Handle different possible output formats from models
+	rawOutput, ok := outputs["last_hidden_state"]
 	if !ok {
-		return nil, fmt.Errorf("unexpected output type")
+		// Try alternative key if last_hidden_state is not present
+		rawOutput, ok = outputs["embeddings"]
+		if !ok {
+			return nil, fmt.Errorf("model output missing 'last_hidden_state' or 'embeddings'")
+		}
 	}
 
-	return embeddings, nil
+	switch v := rawOutput.(type) {
+	case [][]float32:
+		// Already pooled or direct embedding
+		if len(v) != len(texts) {
+			return nil, fmt.Errorf("model output batch size mismatch: expected %d, got %d", len(texts), len(v))
+		}
+		return v, nil
+	case [][][]float32:
+		// 3D tensor [batch, seq, hidden], needs pooling
+		// We implement a simple mean pooling here as a fallback
+		embeddings := make([][]float32, len(v))
+		for i, seq := range v {
+			if len(seq) == 0 {
+				embeddings[i] = make([]float32, p.config.Dimension)
+				continue
+			}
+			dim := len(seq[0])
+			mean := make([]float32, dim)
+			for _, hidden := range seq {
+				for k, val := range hidden {
+					mean[k] += val
+				}
+			}
+			for k := range mean {
+				mean[k] /= float32(len(seq))
+			}
+			embeddings[i] = mean
+		}
+		return embeddings, nil
+	default:
+		return nil, fmt.Errorf("unexpected output type: %T", rawOutput)
+	}
 }
+
 

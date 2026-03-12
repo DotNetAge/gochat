@@ -20,6 +20,7 @@ type GeminiProvider struct {
 	CallbackURL  string // 例如: http://localhost:8080/oauth2/callback
 	ListenAddr   string // 例如: ":8080"
 	HTTPClient   *http.Client
+	TokenURL     string // For testing override
 }
 
 // NewGeminiProvider 创建 Gemini 提供商
@@ -30,6 +31,7 @@ func NewGeminiProvider(clientID, clientSecret, callbackURL, listenAddr string) *
 		CallbackURL:  callbackURL,
 		ListenAddr:   listenAddr,
 		HTTPClient:   &http.Client{Timeout: 30 * time.Second},
+		TokenURL:     "https://oauth2.googleapis.com/token",
 	}
 }
 
@@ -115,7 +117,7 @@ func (p *GeminiProvider) exchangeCodeForToken(code string) (*core.OAuthToken, er
 	data.Set("grant_type", "authorization_code")
 	data.Set("redirect_uri", p.CallbackURL)
 
-	req, err := http.NewRequest("POST", "https://oauth2.googleapis.com/token", bytes.NewBufferString(data.Encode()))
+	req, err := http.NewRequest("POST", p.TokenURL, bytes.NewBufferString(data.Encode()))
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +163,7 @@ func (p *GeminiProvider) RefreshToken(refreshToken string) (*core.OAuthToken, er
 	data.Set("refresh_token", refreshToken)
 	data.Set("grant_type", "refresh_token")
 
-	req, err := http.NewRequest("POST", "https://oauth2.googleapis.com/token", bytes.NewBufferString(data.Encode()))
+	req, err := http.NewRequest("POST", p.TokenURL, bytes.NewBufferString(data.Encode()))
 	if err != nil {
 		return nil, err
 	}

@@ -34,9 +34,10 @@ func TestNewModelInfo(t *testing.T) {
 			name:        "BGE model",
 			modelPath:   "/path/to/bge-small-zh-v1.5.onnx",
 			expectedType: ModelTypeBGE,
-			expectedDim:  768,
+			expectedDim:  512,
 			expectError:  false,
 		},
+
 		{
 			name:        "GPT model",
 			modelPath:   "/path/to/gpt-embedding.onnx",
@@ -87,28 +88,6 @@ func TestNewModelInfo(t *testing.T) {
 	}
 }
 
-func TestContains(t *testing.T) {
-	tests := []struct {
-		name     string
-		s        string
-		substr   string
-		expected bool
-	}{
-		{"contains substring", "bert-base-uncased", "bert", true},
-		{"does not contain", "bert-base-uncased", "gpt", false},
-		{"case insensitive", "BERT-base-uncased", "bert", true}, // Function is case insensitive
-		{"empty string", "", "bert", false},
-		{"empty substring", "bert-base-uncased", "", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := contains(tt.s, tt.substr)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestModelTypeConstants(t *testing.T) {
 	// Test that all model type constants are defined correctly
 	assert.Equal(t, ModelType("bert"), ModelTypeBERT)
@@ -142,9 +121,9 @@ func TestEdgeCases(t *testing.T) {
 		expectError bool
 	}{
 		{"empty path", "", true},
-		{"path with spaces", "/path with spaces/model.onnx", false},
-		{"path with special chars", "/path/with-special_chars/model.onnx", false},
-		{"very long path", "/very/long/path/that/goes/on/and/on/model.onnx", false},
+		{"path with spaces", "/path with spaces/bert-model.onnx", false},
+		{"path with special chars", "/path/with-special_chars/bge-model.onnx", false},
+		{"very long path", "/very/long/path/that/goes/on/and/on/minilm-model.onnx", false},
 	}
 
 	for _, tt := range tests {

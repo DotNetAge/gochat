@@ -21,7 +21,9 @@ func main() {
 	for _, model := range dl.GetModelInfo() {
 		fmt.Printf("- %s (%s): %s\n", model.Name, model.Type, model.Description)
 		fmt.Printf("  Size: %s\n", model.Size)
-		fmt.Printf("  URL: %s\n", model.URL)
+		if len(model.URLs) > 0 {
+			fmt.Printf("  URL: %s\n", model.URLs[0])
+		}
 		fmt.Println()
 	}
 

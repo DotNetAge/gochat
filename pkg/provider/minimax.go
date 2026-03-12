@@ -13,12 +13,14 @@ import (
 
 // MiniMaxProvider MiniMax 提供商
 type MiniMaxProvider struct {
-	HTTPClient  *http.Client
-	TokenHelper *core.TokenHelper
-	PKCEHelper  *core.PKCEHelper
-	Region      string
-	BaseURL     string
-	ClientID    string
+	HTTPClient    *http.Client
+	TokenHelper   *core.TokenHelper
+	PKCEHelper    *core.PKCEHelper
+	Region        string
+	BaseURL       string
+	ClientID      string
+	OAuthCodeURL  string // For testing override
+	OAuthTokenURL string // For testing override
 }
 
 // NewMiniMaxProvider 创建 MiniMax 提供商
@@ -32,12 +34,14 @@ func NewMiniMaxProvider(region string) *MiniMaxProvider {
 	clientID = "78257093-7e40-4613-99e0-527b14b39113"
 
 	return &MiniMaxProvider{
-		HTTPClient:  &http.Client{Timeout: 10 * time.Second},
-		TokenHelper: &core.TokenHelper{},
-		PKCEHelper:  &core.PKCEHelper{},
-		Region:      region,
-		BaseURL:     baseURL,
-		ClientID:    clientID,
+		HTTPClient:    &http.Client{Timeout: 10 * time.Second},
+		TokenHelper:   &core.TokenHelper{},
+		PKCEHelper:    &core.PKCEHelper{},
+		Region:        region,
+		BaseURL:       baseURL,
+		ClientID:      clientID,
+		OAuthCodeURL:  baseURL + "/oauth/code",
+		OAuthTokenURL: baseURL + "/oauth/token",
 	}
 }
 
@@ -69,7 +73,7 @@ func (p *MiniMaxProvider) RequestOAuthCode() (*MiniMaxOAuthAuthorization, string
 
 	requestBody := "response_type=code&client_id=" + p.ClientID + "&scope=group_id%20profile%20model.completion&code_challenge=" + challenge + "&code_challenge_method=S256&state=" + state
 
-	req, err := http.NewRequest("POST", p.BaseURL+"/oauth/code", bytes.NewBufferString(requestBody))
+	req, err := http.NewRequest("POST", p.OAuthCodeURL, bytes.NewBufferString(requestBody))
 	if err != nil {
 		return nil, "", "", err
 	}
@@ -116,7 +120,7 @@ func (p *MiniMaxProvider) RequestOAuthCode() (*MiniMaxOAuthAuthorization, string
 func (p *MiniMaxProvider) PollOAuthToken(userCode, verifier string) (status string, token *core.OAuthToken, errorMsg string) {
 	requestBody := "grant_type=urn:ietf:params:oauth:grant-type:user_code&client_id=" + p.ClientID + "&user_code=" + userCode + "&code_verifier=" + verifier
 
-	req, err := http.NewRequest("POST", p.BaseURL+"/oauth/token", bytes.NewBufferString(requestBody))
+	req, err := http.NewRequest("POST", p.OAuthTokenURL, bytes.NewBufferString(requestBody))
 	if err != nil {
 		return "error", nil, err.Error()
 	}
@@ -231,7 +235,7 @@ func (p *MiniMaxProvider) Authenticate() (*core.OAuthToken, error) {
 func (p *MiniMaxProvider) RefreshToken(refreshToken string) (*core.OAuthToken, error) {
 	requestBody := "grant_type=refresh_token&client_id=" + p.ClientID + "&refresh_token=" + refreshToken
 
-	req, err := http.NewRequest("POST", p.BaseURL+"/oauth/token", bytes.NewBufferString(requestBody))
+	req, err := http.NewRequest("POST", p.OAuthTokenURL, bytes.NewBufferString(requestBody))
 	if err != nil {
 		return nil, err
 	}

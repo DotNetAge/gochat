@@ -1,21 +1,38 @@
-# GoChat
+<div align="center">
+<h1>🚀 GoChat</h1>
+
+<p><b>
+GoChat is a **modern, enterprise-ready Go client SDK for Large Language Models (LLMs)**. It provides an exceptionally elegant and type-safe unified interface that completely smooths out the chaotic API differences between OpenAI, Anthropic (Claude), DeepSeek, Qwen, Ollama, and other major cloud providers or local models.
+
+</b></p>
+
+[![Go Reference](https://pkg.go.dev/badge/github.com/DotNetAge/gochat.svg)](https://pkg.go.dev/github.com/DotNetAge/gochat)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/DotNetAge/gochat)](https://golang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go Report Card](https://goreportcard.com/badge/github.com/DotNetAge/gochat)](https://goreportcard.com/report/github.com/DotNetAge/gochat)
+[![codecov](https://codecov.io/gh/DotNetAge/gochat/graph/badge.svg?token=placeholder)](https://codecov.io/gh/DotNetAge/gochat)
+
+<p>
 
 [**English**](README.md) | [简体中文](README_zh.md)
 
-GoChat is a **modern, enterprise-ready Go client SDK for Large Language Models (LLMs)**. It provides an exceptionally elegant and type-safe unified interface that completely smooths out the chaotic API differences between OpenAI, Anthropic (Claude), DeepSeek, Qwen, Ollama, and other major cloud providers or local models.
-
-Whether you need basic chat, **Deep Thinking (Reasoning)**, **Built-in Web Search**, **Multimodal (Vision/Documents)**, or even enterprise-level **OAuth 2.0 / Portal Gateway Authentication Persistence**, you only need to master one set of interfaces to roam freely.
-
+</p>
+</div>
 ---
 
-## ✨ Killer Features
+## ✨ New & Killer Features
 
-- **🔌 Seamless Model Switching**: Change one line of initialization code to switch your application effortlessly between GPT-4o, Claude 3.7, DeepSeek-R1, and Qwen-Max, without even touching the `Messages` struct.
-- **🧠 Native Deep Thinking Support**: Built-in interceptors perfectly compatible with the reasoning chains of DeepSeek-R1, Claude 3.7, and OpenAI o1/o3. The streaming API beautifully separates the model's "internal thought process" from its final answer.
-- **🌐 Turn on Web Search at Will**: Native support for models with external web retrieval capabilities (like Qwen). A single line of code `core.WithEnableSearch(true)` unlocks real-time superpowers.
-- **🛡️ Smart Secret Hosting**: Say goodbye to hardcoded secret leaks! Pass in an alias key name (e.g., `DASHSCOPE_API_KEY`), and the engine automatically sniffs and extracts system environment variables for secure authentication.
-- **🏢 Enterprise OAuth2 Persistence**: The powerful built-in `AuthManager` is designed for accessing enterprise gateways (like Qwen Portal or GCP Gemini). It fully automates the Device Code Flow / OAuth2 authorization, persistent Token storage (supports custom Stores like Memory/File/Database), and silent, seamless auto-refreshing.
-- **🛠️ Complete Agent Infrastructure**: Multi-turn conversation context management, structured Tool/Function Calling, document reading & extraction, and multimodal image recognition—all out of the box.
+- **🔌 Seamless Model Switching**: Change one line of initialization code to switch your application effortlessly between GPT-4o, Claude 3.7, DeepSeek-R1, and Qwen-Max.
+- **🧠 Native Deep Thinking Support**: Built-in interceptors compatible with the reasoning chains of DeepSeek-R1, Claude 3.7, and OpenAI o1/o3.
+- **🧬 Unified Embedding System**: 
+    - Support for both **Remote APIs** (OpenAI/Azure) and **Local Models** (ONNX/BGE/Sentence-BERT).
+    - High-performance **Batch Processing** with concurrent execution and atomic progress tracking.
+    - Built-in **LRU Caching** to avoid redundant vector calculations.
+- **⛓️ Modular Pipeline Framework**: 
+    - Orchestrate complex LLM workflows (RAG, multi-step reasoning) using a clean **Step-based** architecture.
+    - Thread-safe **State Management** and execution **Hooks** for full observability.
+- **🌐 Web Search at Will**: Native support for models with external web retrieval (like Qwen) via `core.WithEnableSearch(true)`.
+- **🏢 Enterprise OAuth2 Persistence**: Automates Device Code Flow / OAuth2 authorization with persistent Token storage and auto-refreshing.
 
 ---
 
@@ -27,146 +44,75 @@ go get github.com/DotNetAge/gochat
 
 ---
 
-## 🚀 Quick Start (Everything you need to know)
+## 🚀 Quick Start
 
-### 1. Basic Chat (with Smart Secret Hosting)
-
-Set up your environment variables, e.g., `export OPENAI_API_KEY="sk-..."`.
+### 1. High-Performance Embedding (Local or Remote)
 
 ```go
-package main
-
-import (
-	"context"
-	"fmt"
-	"github.com/DotNetAge/gochat/pkg/client/base"
-	"github.com/DotNetAge/gochat/pkg/client/openai"
-	"github.com/DotNetAge/gochat/pkg/core"
-)
-
-func main() {
-	// The engine detects "OPENAI_API_KEY" as an env var name and safely retrieves the real key from the system!
-	client, _ := openai.New(openai.Config{
-		Config: base.Config{
-			APIKey: "OPENAI_API_KEY",
-			Model:  "gpt-4o",
-		},
-	})
-
-	resp, _ := client.Chat(context.Background(), []core.Message{
-		core.NewUserMessage("Hello, please introduce yourself."),
-	})
-
-	fmt.Println(resp.Content)
-}
-```
-
-### 2. Switching to DeepSeek & Capturing the "Chain of Thought" in a Stream?
-
-Just change a few lines of initialization code and add the `WithThinking` option:
-
-```go
-import "github.com/DotNetAge/gochat/pkg/client/deepseek"
-
-client, _ := deepseek.New(deepseek.Config{
-	Config: base.Config{
-		APIKey: "DEEPSEEK_API_KEY", 
-		// No need to explicitly specify deepseek-reasoner; it automatically adapts when thinking is enabled.
-	},
+// Use BatchProcessor for optimized vector generation
+processor := embedding.NewBatchProcessor(provider, embedding.BatchOptions{
+    MaxBatchSize:  32,
+    MaxConcurrent: 4,
 })
 
-// Enable the thinking engine and use streaming output
+// Generate embeddings with progress tracking
+embeddings, err := processor.ProcessWithProgress(ctx, texts, func(current, total int, err error) bool {
+    fmt.Printf("Progress: %d/%d\n", current, total)
+    return true // Return false to cancel
+})
+```
+
+### 2. Streamlined Pipeline Execution
+
+```go
+p := pipeline.New().
+    AddStep(steps.NewTemplateStep("User question: {{.query}}", "prompt", "query")).
+    AddStep(steps.NewGenerateCompletionStep(client, "prompt", "answer", "gpt-4o")).
+    AddHook(myLogger) // Observe every step
+
+state := pipeline.NewState()
+state.Set("query", "What is GoChat?")
+
+err := p.Execute(ctx, state)
+fmt.Println(state.GetString("answer"))
+```
+
+### 3. Capturing the "Chain of Thought" in a Stream
+
+```go
 stream, _ := client.ChatStream(ctx, messages, core.WithThinking(0))
 defer stream.Close()
 
-fmt.Println("[🤔 Deep Thinking Process]:")
-isAnswering := false
-
 for stream.Next() {
-	ev := stream.Event()
-	
-	if ev.Type == core.EventThinking { // Capture the internal reasoning logic
-		fmt.Print(ev.Content)
-	} else if ev.Type == core.EventContent {
-		if !isAnswering {
-			fmt.Println("\n\n[💡 Final Answer]:")
-			isAnswering = true
-		}
-		fmt.Print(ev.Content)
-	}
+    ev := stream.Event()
+    if ev.Type == core.EventThinking {
+        fmt.Print(ev.Content) // Reasoning output
+    } else if ev.Type == core.EventContent {
+        fmt.Print(ev.Content) // Final answer
+    }
 }
-```
-
-### 3. Calling Alibaba Qwen and Enabling Built-in Web Search?
-
-```go
-import "github.com/DotNetAge/gochat/pkg/client/compatible"
-
-client, _ := compatible.New(compatible.Config{
-	Config: base.Config{
-		APIKey:  "DASHSCOPE_API_KEY",
-		Model:   "qwen-max",
-		BaseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-	},
-})
-
-// One line of code grants the model real-time web retrieval capabilities
-resp, _ := client.Chat(ctx, []core.Message{
-	core.NewUserMessage("How are the top three NASDAQ indices performing today?"),
-}, core.WithEnableSearch(true))
-
-fmt.Println(resp.Content)
-```
-
-### 4. Advanced: Logging into Enterprise Gateways via OAuth2/Device Code?
-
-If your provider (like Qwen Portal or Gemini) doesn't allow simple API Keys but requires user authorization to issue an `Access Token`, don't panic. Hand it over to `AuthManager`.
-
-```go
-import "github.com/DotNetAge/gochat/pkg/core"
-import "github.com/DotNetAge/gochat/pkg/provider"
-
-// 1. Initialize the provider's OAuth protocol implementation
-p := provider.NewQwenProvider()
-
-// 2. Mount it to the AuthManager, specifying a local persistence file (or inject your Redis Store)
-authMgr := core.NewAuthManager(p, "token_store.json")
-
-// 3. Smartly fetch the Token
-// - If it exists locally and isn't expired: Return directly.
-// - If it's expired: Silently Auto-Refresh via the gateway and overwrite the old file.
-// - If it doesn't exist: Automatically pop up the browser auth flow, intercept the Callback, and save the new Token!
-token, _ := authMgr.GetToken()
-
-// 4. Seamlessly pass the dynamically acquired Token to the client
-client, _ := compatible.New(compatible.Config{
-	Config: base.Config{
-		AuthToken: token.Access, // <--- Use dynamic token
-		Model:     "coder-model",
-		BaseURL:   "https://portal.qwen.ai",
-	},
-})
-
-client.Chat(...)
 ```
 
 ---
 
 ## 🔌 Fully Supported Providers
 
-*   **OpenAI** (`gpt-4o`, `o1`, `o3-mini`, etc.)
-*   **Anthropic** (`claude-3-7-sonnet`, `opus`, etc.)
-*   **DeepSeek** (`deepseek-chat`, `deepseek-reasoner`, etc.)
-*   **Alibaba Qwen** (Cloud Models & Portal Exclusive Gateways)
-*   **Ollama** (Running Open-Source Models Locally)
-*   **Azure OpenAI** (Microsoft Cloud Enterprise Deployment)
-*   **OpenAI-Compatible** (Any VLLM, LM Studio nodes, or proxies adhering to the OpenAI interface standard)
+| Provider          | Models              | Auth Methods                 |
+| :---------------- | :------------------ | :--------------------------- |
+| **OpenAI**        | GPT-4o, o1, o3-mini | API Key                      |
+| **Anthropic**     | Claude 3.5/3.7      | API Key                      |
+| **DeepSeek**      | V3, R1              | API Key                      |
+| **Alibaba Qwen**  | Qwen-Max, Qwen-Plus | API Key, OAuth2, Device Code |
+| **Google Gemini** | 1.5 Pro/Flash       | API Key, OAuth2              |
+| **Local / ONNX**  | BGE, Sentence-BERT  | Local Execution              |
+| **Azure OpenAI**  | All GPT models      | API Key (Azure format)       |
 
-## 🎯 Design Philosophy & Conventions
+---
 
-GoChat adheres to Go's philosophy of minimalism: The core interface `core.Client` has only two methods: `Chat` and `ChatStream`.
-All provider-specific customizations (like enabling search, setting thinking word limits, or injecting toolsets) are elegantly extended via **Functional Options** (`core.Option`), ensuring the main interface is never polluted.
+## 🎯 Design Philosophy
+
+GoChat adheres to Go's philosophy of minimalism: The core interface `core.Client` has only two methods: `Chat` and `ChatStream`. All provider-specific customizations are elegantly extended via **Functional Options**, ensuring the main interface remains clean and stable.
 
 ## 📄 License
 
-This project is open-sourced under the [MIT License](LICENSE). PRs are welcome as we build the strongest LLM infrastructure for the Go ecosystem!
+This project is open-sourced under the [MIT License](LICENSE). PRs are welcome!

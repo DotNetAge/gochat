@@ -184,10 +184,11 @@ func (d *Downloader) DownloadModel(modelName string, callback ProgressCallback) 
 		// Get content length for progress tracking
 		contentLength := resp.ContentLength
 
-		// Create output file
-		dst, err := os.Create(filePath)
+		// Create temporary file for atomic download
+		tmpPath := filePath + ".tmp"
+		dst, err := os.Create(tmpPath)
 		if err != nil {
-			return "", fmt.Errorf("failed to create output file: %w", err)
+			return "", fmt.Errorf("failed to create temporary file: %w", err)
 		}
 
 		// Copy content with progress tracking
@@ -208,12 +209,18 @@ func (d *Downloader) DownloadModel(modelName string, callback ProgressCallback) 
 
 		if err != nil {
 			// Clean up partial file
-			os.Remove(filePath)
+			os.Remove(tmpPath)
 			return "", fmt.Errorf("failed to save file %s: %w", fileName, err)
+		}
+
+		// Atomically move temporary file to final destination
+		if err := os.Rename(tmpPath, filePath); err != nil {
+			return "", fmt.Errorf("failed to rename temporary file: %w", err)
 		}
 
 		fmt.Printf("Download completed: %s\n", fileName)
 	}
+
 
 	fmt.Printf("All files downloaded to: %s\n", modelDir)
 	return modelDir, nil
