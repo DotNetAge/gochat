@@ -25,6 +25,13 @@ func (p *Pipeline) AddStep(step Step) *Pipeline {
 	return p
 }
 
+func (p *Pipeline) AddSteps(steps ...Step) *Pipeline {
+	for _, step := range steps {
+		p.AddStep(step)
+	}
+	return p
+}
+
 // AddHook appends an observer hook to the pipeline.
 func (p *Pipeline) AddHook(hook Hook) *Pipeline {
 	p.hooks = append(p.hooks, hook)
