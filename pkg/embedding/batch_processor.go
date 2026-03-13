@@ -1,5 +1,3 @@
-// Package embedding provides interfaces and implementations for text embedding generation.
-// It supports both local and remote embedding models with batch processing and caching capabilities.
 package embedding
 
 import (
@@ -28,10 +26,10 @@ type ProgressCallback func(current, total int, err error) bool
 // BatchProcessor handles batch processing of embeddings with optimization features
 // including caching, concurrent processing, and progress tracking.
 type BatchProcessor struct {
-	provider      Provider
-	options       BatchOptions
-	cache         map[string][]float32
-	cacheMutex    sync.RWMutex
+	provider   Provider
+	options    BatchOptions
+	cache      map[string][]float32
+	cacheMutex sync.RWMutex
 }
 
 // NewBatchProcessor creates a new batch processor with the given provider and options.
@@ -53,9 +51,9 @@ func NewBatchProcessor(provider Provider, options BatchOptions) *BatchProcessor 
 	}
 
 	return &BatchProcessor{
-		provider:  provider,
-		options:   options,
-		cache:     make(map[string][]float32),
+		provider: provider,
+		options:  options,
+		cache:    make(map[string][]float32),
 	}
 }
 
@@ -178,4 +176,3 @@ func (bp *BatchProcessor) ProcessWithProgress(
 
 	return results, nil
 }
-

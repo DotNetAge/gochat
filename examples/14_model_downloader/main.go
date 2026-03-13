@@ -6,17 +6,13 @@ import (
 	"log"
 
 	"github.com/DotNetAge/gochat/pkg/embedding"
-	"github.com/DotNetAge/gochat/pkg/embedding/downloader"
-	"github.com/DotNetAge/gochat/pkg/embedding/models"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// Create downloader
-	dl := downloader.NewDownloader("")
+	dl := embedding.NewDownloader("")
 
-	// List available models
 	fmt.Println("Available models:")
 	for _, model := range dl.GetModelInfo() {
 		fmt.Printf("- %s (%s): %s\n", model.Name, model.Type, model.Description)
@@ -27,7 +23,6 @@ func main() {
 		fmt.Println()
 	}
 
-	// Download a model with progress tracking
 	modelName := "bge-small-zh-v1.5"
 	fmt.Printf("Downloading model: %s\n", modelName)
 	
@@ -46,8 +41,7 @@ func main() {
 
 	fmt.Printf("Model downloaded to: %s\n", modelPath)
 
-	// Create provider from downloaded model
-	provider, err := models.NewProvider(modelPath)
+	provider, err := embedding.NewProvider(modelPath)
 	if err != nil {
 		log.Fatalf("Failed to create provider: %v", err)
 	}
@@ -55,20 +49,17 @@ func main() {
 	fmt.Printf("Created provider for model: %s\n", modelName)
 	fmt.Printf("Embedding dimension: %d\n", provider.Dimension())
 
-	// Create batch processor for better performance
 	batchProcessor := embedding.NewBatchProcessor(provider, embedding.BatchOptions{
 		MaxBatchSize:  32,
 		MaxConcurrent: 4,
 	})
 
-	// Texts to embed
 	texts := []string{
 		"你好，这是一个测试",
 		"Go 是一种编程语言",
 		"嵌入是文本的向量表示",
 	}
 
-	// Generate embeddings with progress tracking
 	embeddings, err := batchProcessor.ProcessWithProgress(ctx, texts, func(current, total int, err error) bool {
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
@@ -82,7 +73,6 @@ func main() {
 		log.Fatalf("Failed to generate embeddings: %v", err)
 	}
 
-	// Print results
 	fmt.Printf("Generated %d embeddings\n", len(embeddings))
 	fmt.Printf("Embedding dimension: %d\n", provider.Dimension())
 
