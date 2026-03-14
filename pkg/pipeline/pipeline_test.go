@@ -27,15 +27,15 @@ type MockHook struct {
 	mock.Mock
 }
 
-func (m *MockHook) OnStepStart(ctx context.Context, step Step, state *State) {
+func (m *MockHook) OnStepStart(ctx context.Context, step Step[*State], state *State) {
 	m.Called(ctx, step, state)
 }
 
-func (m *MockHook) OnStepError(ctx context.Context, step Step, state *State, err error) {
+func (m *MockHook) OnStepError(ctx context.Context, step Step[*State], state *State, err error) {
 	m.Called(ctx, step, state, err)
 }
 
-func (m *MockHook) OnStepComplete(ctx context.Context, step Step, state *State) {
+func (m *MockHook) OnStepComplete(ctx context.Context, step Step[*State], state *State) {
 	m.Called(ctx, step, state)
 }
 
@@ -70,7 +70,7 @@ func TestState(t *testing.T) {
 func TestPipeline_Execute(t *testing.T) {
 	ctx := context.Background()
 	state := NewState()
-	p := New()
+	p := New[*State]()
 
 	step1 := new(MockStep)
 	step1.On("Name").Return("step1").Maybe()
@@ -99,7 +99,7 @@ func TestPipeline_Execute(t *testing.T) {
 func TestPipeline_Error(t *testing.T) {
 	ctx := context.Background()
 	state := NewState()
-	p := New()
+	p := New[*State]()
 
 	step1 := new(MockStep)
 	errTest := errors.New("test error")
@@ -123,7 +123,7 @@ func TestPipeline_Error(t *testing.T) {
 func TestPipeline_ContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	state := NewState()
-	p := New()
+	p := New[*State]()
 
 	step1 := new(MockStep)
 	step1.On("Name").Return("step1").Maybe()
@@ -135,4 +135,30 @@ func TestPipeline_ContextCancel(t *testing.T) {
 	err := p.Execute(ctx, state)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "pipeline aborted")
+}
+
+// Ensure generic strong typing works
+type MyTypedContext struct {
+	Input  string
+	Output string
+}
+
+type MyTypedStep struct{}
+
+func (s *MyTypedStep) Name() string { return "typed_step" }
+func (s *MyTypedStep) Execute(ctx context.Context, state *MyTypedContext) error {
+	state.Output = state.Input + " processed"
+	return nil
+}
+
+func TestPipeline_StronglyTyped(t *testing.T) {
+	ctx := context.Background()
+	state := &MyTypedContext{Input: "test"}
+	
+	p := New[*MyTypedContext]()
+	p.AddStep(&MyTypedStep{})
+	
+	err := p.Execute(ctx, state)
+	assert.NoError(t, err)
+	assert.Equal(t, "test processed", state.Output)
 }

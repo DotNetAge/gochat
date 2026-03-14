@@ -6,26 +6,26 @@ import (
 )
 
 // Pipeline manages a sequence of steps.
-type Pipeline struct {
-	steps []Step
-	hooks []Hook
+type Pipeline[T any] struct {
+	steps []Step[T]
+	hooks []Hook[T]
 }
 
 // New creates a new, empty pipeline.
-func New() *Pipeline {
-	return &Pipeline{
-		steps: make([]Step, 0),
-		hooks: make([]Hook, 0),
+func New[T any]() *Pipeline[T] {
+	return &Pipeline[T]{
+		steps: make([]Step[T], 0),
+		hooks: make([]Hook[T], 0),
 	}
 }
 
 // AddStep appends a step to the pipeline.
-func (p *Pipeline) AddStep(step Step) *Pipeline {
+func (p *Pipeline[T]) AddStep(step Step[T]) *Pipeline[T] {
 	p.steps = append(p.steps, step)
 	return p
 }
 
-func (p *Pipeline) AddSteps(steps ...Step) *Pipeline {
+func (p *Pipeline[T]) AddSteps(steps ...Step[T]) *Pipeline[T] {
 	for _, step := range steps {
 		p.AddStep(step)
 	}
@@ -33,18 +33,14 @@ func (p *Pipeline) AddSteps(steps ...Step) *Pipeline {
 }
 
 // AddHook appends an observer hook to the pipeline.
-func (p *Pipeline) AddHook(hook Hook) *Pipeline {
+func (p *Pipeline[T]) AddHook(hook Hook[T]) *Pipeline[T] {
 	p.hooks = append(p.hooks, hook)
 	return p
 }
 
 // Execute runs all steps sequentially. If any step fails or the context is canceled,
 // execution stops and the error is returned.
-func (p *Pipeline) Execute(ctx context.Context, state *State) error {
-	if state == nil {
-		return fmt.Errorf("pipeline state cannot be nil")
-	}
-
+func (p *Pipeline[T]) Execute(ctx context.Context, state T) error {
 	for _, step := range p.steps {
 		// Check for context cancellation before starting next step
 		if err := ctx.Err(); err != nil {
