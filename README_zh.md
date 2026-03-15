@@ -68,7 +68,7 @@ embeddings, err := processor.ProcessWithProgress(ctx, texts, func(current, total
 ### 2. 流水线 (Pipeline) 工作流
 
 ```go
-p := pipeline.New().
+p := pipeline.New[*pipeline.State]().
     AddStep(steps.NewTemplateStep("用户问题: {{.query}}", "prompt", "query")).
     AddStep(steps.NewGenerateCompletionStep(client, "prompt", "answer", "gpt-4o")).
     AddHook(myLogger) // 观察每一步的执行

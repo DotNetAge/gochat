@@ -62,13 +62,13 @@ type ollamaOptions struct {
 }
 
 type ollamaResponse struct {
-	Model              string         `json:"model"`
-	CreatedAt          string         `json:"created_at"`
-	Message            *ollamaMessage `json:"message,omitempty"`
-	Done               bool           `json:"done"`
-	DoneReason         string         `json:"done_reason,omitempty"`
-	PromptEvalCount    int            `json:"prompt_eval_count,omitempty"`
-	EvalCount          int            `json:"eval_count,omitempty"`
+	Model           string         `json:"model"`
+	CreatedAt       string         `json:"created_at"`
+	Message         *ollamaMessage `json:"message,omitempty"`
+	Done            bool           `json:"done"`
+	DoneReason      string         `json:"done_reason,omitempty"`
+	PromptEvalCount int            `json:"prompt_eval_count,omitempty"`
+	EvalCount       int            `json:"eval_count,omitempty"`
 }
 
 // New creates a new Ollama client
@@ -90,6 +90,17 @@ func New(config Config) (*Client, error) {
 	return &Client{
 		base: baseClient,
 	}, nil
+}
+
+// DefaultOllamaClient 创建默认的 Ollama 客户端
+// 使用 qwen3.5:0.8b 模型，适用于本地智能分块和图提取
+func DefaultOllamaClient() (*Client, error) {
+	return New(Config{
+		Config: base.Config{
+			Model:   "qwen3.5:0.8b",
+			BaseURL: "http://localhost:11434",
+		},
+	})
 }
 
 // Chat performs a non-streaming chat completion

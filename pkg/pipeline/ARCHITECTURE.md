@@ -4,6 +4,8 @@
 
 Pipeline 包提供了一个灵活的框架，用于组合和执行 LLM 工作流中的操作序列（如 RAG 和数据处理）。包的设计采用了管道模式，将复杂的工作流分解为独立的步骤，并通过状态共享实现步骤间的数据传递。
 
+**在最新版本中，Pipeline 已全面支持 Go 泛型**。这意味着您可以传递任何自定义的强类型 `struct` 作为管道执行上下文，而不再局限于基于 `map[string]any` 的弱类型状态管理，这极大地提升了类型安全性并改善了开发者体验。
+
 ## 架构图
 
 ```mermaid
@@ -37,13 +39,13 @@ flowchart TD
 classDiagram
     direction LR
     
-    class Pipeline {
-        -steps []Step
-        -hooks []Hook
-        +New()
-        +AddStep(step Step) *Pipeline
-        +AddHook(hook Hook) *Pipeline
-        +Execute(ctx context.Context, state *State) error
+    class Pipeline~T~ {
+        -steps []Step~T~
+        -hooks []Hook~T~
+        +New() *Pipeline~T~
+        +AddStep(step Step~T~) *Pipeline
+        +AddHook(hook Hook~T~) *Pipeline
+        +Execute(ctx context.Context, state T) error
     }
     
     class State {
@@ -57,15 +59,15 @@ classDiagram
         +Clone() *State
     }
     
-    class Step {
+    class Step~T~ {
         +Name() string
-        +Execute(ctx context.Context, state *State) error
+        +Execute(ctx context.Context, state T) error
     }
     
-    class Hook {
-        +OnStepStart(ctx context.Context, step Step, state *State)
-        +OnStepError(ctx context.Context, step Step, state *State, err error)
-        +OnStepComplete(ctx context.Context, step Step, state *State)
+    class Hook~T~ {
+        +OnStepStart(ctx context.Context, step Step~T~, state T)
+        +OnStepError(ctx context.Context, step Step~T~, state T, err error)
+        +OnStepComplete(ctx context.Context, step Step~T~, state T)
     }
     
     class TemplateStep {
@@ -74,7 +76,7 @@ classDiagram
         -inputKeys []string
         +NewTemplateStep(templateStr string, outputKey string, inputKeys ...string) *TemplateStep
         +Name() string
-        +Execute(ctx context.Context, state *State) error
+        +Execute(ctx context.Context, state T) error
     }
     
     class GenerateCompletionStep {
@@ -86,7 +88,7 @@ classDiagram
         +NewGenerateCompletionStep(client core.Client, inputKey string, outputKey string, model string) *GenerateCompletionStep
         +WithSystemPrompt(sysPrompt string) *GenerateCompletionStep
         +Name() string
-        +Execute(ctx context.Context, state *State) error
+        +Execute(ctx context.Context, state T) error
     }
     
     Pipeline *-- Step
@@ -104,7 +106,7 @@ classDiagram
 - **职责**：定义管道中的单个操作
 - **方法**：
   - `Name()`：返回步骤名称，用于日志和调试
-  - `Execute(ctx context.Context, state *State) error`：执行步骤操作，从 State 读取数据并写入结果
+  - `Execute(ctx context.Context, state T) error`：执行步骤操作，从 State 读取数据并写入结果
 
 #### Hook 接口
 - **职责**：观察管道执行过程
@@ -123,8 +125,8 @@ classDiagram
   - 遇到错误或上下文取消时停止执行
   - 支持钩子观察执行过程
 
-#### State
-- **职责**：线程安全的数据容器，用于步骤间数据传递
+#### State (兼容保留)
+- **职责**：线程安全的键值对数据容器，可选作泛型类型 `T` 进行步骤间数据传递（黑板模式）
 - **特点**：
   - 线程安全（使用 `sync.RWMutex`）
   - 支持多种类型获取（Get, GetString 等）
@@ -159,11 +161,42 @@ classDiagram
 
 ## 使用示例
 
-### 基本使用
+
+### 强类型使用示例（推荐）
+
+通过定义强类型的业务 Context，告别容易出错的 Map 与 Key：
+
+```go
+// 1. 定义强类型业务上下文
+type MyRAGContext struct {
+    Query        string
+    ContextTexts []string
+    Answer       string
+}
+
+// 2. 编写针对该类型的 Step
+type RetrievalStep struct{}
+func (s *RetrievalStep) Name() string { return "Retrieval" }
+func (s *RetrievalStep) Execute(ctx context.Context, state *MyRAGContext) error {
+    // 直接操作强类型的字段，类型绝对安全！
+    state.ContextTexts = []string{"知识片段1", "知识片段2"}
+    return nil
+}
+
+// 3. 组装并执行 Pipeline
+p := pipeline.New[*MyRAGContext]()
+p.AddStep(&RetrievalStep{})
+
+myState := &MyRAGContext{Query: "Go 1.24 有什么新特性？"}
+err := p.Execute(context.Background(), myState)
+```
+
+### 动态类型使用示例（兼容旧版）
+
 
 ```go
 // 创建管道
-p := pipeline.New()
+p := pipeline.New[*pipeline.State]()
 
 // 添加步骤
 p.AddStep(steps.NewTemplateStep(
@@ -217,7 +250,7 @@ func (h *LoggingHook) OnStepComplete(ctx context.Context, step pipeline.Step, st
 
 ```go
 // 链式调用
-result, err := pipeline.New().
+result, err := pipeline.New[*pipeline.State]().
     AddStep(steps.NewTemplateStep("{{.input}}", "prompt", "input")).
     AddStep(steps.NewGenerateCompletionStep(client, "prompt", "output", "gpt-4")).
     Execute(ctx, state)

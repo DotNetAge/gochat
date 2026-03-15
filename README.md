@@ -66,7 +66,7 @@ embeddings, err := processor.ProcessWithProgress(ctx, texts, func(current, total
 ### 2. Streamlined Pipeline Execution
 
 ```go
-p := pipeline.New().
+p := pipeline.New[*pipeline.State]().
     AddStep(steps.NewTemplateStep("User question: {{.query}}", "prompt", "query")).
     AddStep(steps.NewGenerateCompletionStep(client, "prompt", "answer", "gpt-4o")).
     AddHook(myLogger) // Observe every step

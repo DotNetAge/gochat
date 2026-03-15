@@ -2,6 +2,8 @@ package embedding
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 )
 
 // Model is a generic model implementation for embedding generation
@@ -75,4 +77,62 @@ func NewProvider(modelPath string) (Provider, error) {
 			MaxBatchSize: 32,
 		})
 	}
+}
+
+// WithBEG 创建 BGE Embedding Provider
+// modelName: 模型名称，例如 "bge-small-zh-v1.5"
+// modelPath: 模型路径，如果为空则自动下载
+func WithBEG(modelName, modelPath string) (Provider, error) {
+	// 如果未指定路径，使用默认下载目录
+	if modelPath == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			homeDir = "."
+		}
+		modelPath = filepath.Join(homeDir, ".embedding", modelName)
+	}
+
+	// 检查模型是否存在
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		// 自动下载模型
+		fmt.Printf("Model not found, downloading %s to %s...\n", modelName, modelPath)
+		downloader := NewDownloader("")
+		_, downloadErr := downloader.DownloadModel(modelName, nil)
+		if downloadErr != nil {
+			return nil, fmt.Errorf("failed to download model: %w", downloadErr)
+		}
+		fmt.Println("Model downloaded successfully")
+	}
+
+	// 创建 Provider
+	return NewProvider(modelPath)
+}
+
+// WithBERT 创建 BERT Embedding Provider
+// modelName: 模型名称，例如 "all-mpnet-base-v2"
+// modelPath: 模型路径，如果为空则自动下载
+func WithBERT(modelName, modelPath string) (Provider, error) {
+	// 如果未指定路径，使用默认下载目录
+	if modelPath == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			homeDir = "."
+		}
+		modelPath = filepath.Join(homeDir, ".embedding", modelName)
+	}
+
+	// 检查模型是否存在
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		// 自动下载模型
+		fmt.Printf("Model not found, downloading %s to %s...\n", modelName, modelPath)
+		downloader := NewDownloader("")
+		_, downloadErr := downloader.DownloadModel(modelName, nil)
+		if downloadErr != nil {
+			return nil, fmt.Errorf("failed to download model: %w", downloadErr)
+		}
+		fmt.Println("Model downloaded successfully")
+	}
+
+	// 创建 Provider
+	return NewProvider(modelPath)
 }
