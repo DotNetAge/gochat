@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/DotNetAge/gochat/pkg/client/base"
 	"github.com/DotNetAge/gochat/pkg/client/openaicompat"
@@ -51,11 +52,11 @@ func New(config Config) (*Client, error) {
 	}
 
 	if config.Model == "" {
-		config.Model = "gpt-3.5-turbo"
+		config.Model = "qwen3.5-flash"
 	}
 
 	if config.BaseURL == "" {
-		config.BaseURL = "https://api.openai.com"
+		config.BaseURL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
 	}
 
 	baseClient := base.New(config.Config)
@@ -98,13 +99,13 @@ func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts .
 	// Build request
 	model := c.resolveModel(options)
 	reqBody := openaicompat.ChatCompletionRequest{
-		Model:       model,
-		Messages:    openaicompat.MessagesToWire(messages, options.SystemPrompt),
-		Temperature: c.resolveTemperature(options),
-		MaxTokens:   c.resolveMaxTokens(options),
-		TopP:        c.resolveTopP(options),
-		Stop:        options.Stop,
-		Stream:      true,
+		Model:        model,
+		Messages:     openaicompat.MessagesToWire(messages, options.SystemPrompt),
+		Temperature:  c.resolveTemperature(options),
+		MaxTokens:    c.resolveMaxTokens(options),
+		TopP:         c.resolveTopP(options),
+		Stop:         options.Stop,
+		Stream:       true,
 		EnableSearch: options.EnableSearch,
 	}
 
@@ -121,7 +122,13 @@ func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts .
 		return nil, core.NewValidationError("failed to marshal request", err)
 	}
 
-	url := fmt.Sprintf("%s/v1/chat/completions", c.base.Config().BaseURL)
+	// NOTES: 所有兼容OpenAI的请求都约定俗成地使用/v1/chat/completions作为请求路径的结尾
+	baseURL := strings.TrimSuffix(c.base.Config().BaseURL, "/")
+	if !strings.HasSuffix(baseURL, "/v1") {
+		baseURL = baseURL + "/v1"
+	}
+	url := fmt.Sprintf("%s/chat/completions", baseURL)
+
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
 	if err != nil {
 		return nil, core.NewNetworkError("failed to create request", err)
@@ -183,13 +190,13 @@ func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts .
 func (c *Client) doChat(ctx context.Context, messages []core.Message, options core.Options, stream bool) (*core.Response, error) {
 	model := c.resolveModel(options)
 	reqBody := openaicompat.ChatCompletionRequest{
-		Model:       model,
-		Messages:    openaicompat.MessagesToWire(messages, options.SystemPrompt),
-		Temperature: c.resolveTemperature(options),
-		MaxTokens:   c.resolveMaxTokens(options),
-		TopP:        c.resolveTopP(options),
-		Stop:        options.Stop,
-		Stream:      stream,
+		Model:        model,
+		Messages:     openaicompat.MessagesToWire(messages, options.SystemPrompt),
+		Temperature:  c.resolveTemperature(options),
+		MaxTokens:    c.resolveMaxTokens(options),
+		TopP:         c.resolveTopP(options),
+		Stop:         options.Stop,
+		Stream:       stream,
 		EnableSearch: options.EnableSearch,
 	}
 
@@ -205,8 +212,12 @@ func (c *Client) doChat(ctx context.Context, messages []core.Message, options co
 	if err != nil {
 		return nil, core.NewValidationError("failed to marshal request", err)
 	}
+	baseURL := strings.TrimSuffix(c.base.Config().BaseURL, "/")
+	if !strings.HasSuffix(baseURL, "/v1") {
+		baseURL = baseURL + "/v1"
+	}
+	url := fmt.Sprintf("%s/chat/completions", baseURL)
 
-	url := fmt.Sprintf("%s/v1/chat/completions", c.base.Config().BaseURL)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
 	if err != nil {
 		return nil, core.NewNetworkError("failed to create request", err)

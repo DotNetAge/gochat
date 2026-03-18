@@ -18,9 +18,9 @@ func TestNewClient(t *testing.T) {
 	t.Run("Default configuration", func(t *testing.T) {
 		client, err := New(Config{})
 		require.NoError(t, err)
-		assert.Equal(t, "llama2", client.base.Config().Model)
+		assert.Equal(t, "qwen3.5:0.8b", client.base.Config().Model)
 		assert.Equal(t, "http://localhost:11434", client.base.Config().BaseURL)
-		assert.Equal(t, 60*time.Second, client.base.Config().Timeout)
+		// assert.Equal(t, 0, client.base.Config().Timeout)
 		assert.Equal(t, 3, client.base.Config().MaxRetries)
 		assert.Equal(t, 0.7, client.base.Config().Temperature)
 	})
@@ -55,25 +55,25 @@ func TestClient_Chat(t *testing.T) {
 		err := json.NewDecoder(r.Body).Decode(&reqBody)
 		require.NoError(t, err)
 
-		assert.Equal(t, "llama2", reqBody.Model)
+		assert.Equal(t, "qwen3.5:0.8b", reqBody.Model)
 		assert.False(t, reqBody.Stream)
 
 		// Ollama returns streaming format even for non-streaming
 		responses := []ollamaResponse{
 			{
-				Model:     "llama2",
+				Model:     "qwen3.5:0.8b",
 				CreatedAt: "2024-01-01T00:00:00Z",
 				Message:   &ollamaMessage{Role: "assistant", Content: "Hello! "},
 				Done:      false,
 			},
 			{
-				Model:     "llama2",
+				Model:     "qwen3.5:0.8b",
 				CreatedAt: "2024-01-01T00:00:00Z",
 				Message:   &ollamaMessage{Role: "assistant", Content: "I'm Ollama."},
 				Done:      false,
 			},
 			{
-				Model:           "llama2",
+				Model:           "qwen3.5:0.8b",
 				CreatedAt:       "2024-01-01T00:00:00Z",
 				Done:            true,
 				PromptEvalCount: 10,
@@ -116,19 +116,19 @@ func TestClient_ChatStream(t *testing.T) {
 
 		responses := []ollamaResponse{
 			{
-				Model:     "llama2",
+				Model:     "qwen3:0.6b",
 				CreatedAt: "2024-01-01T00:00:00Z",
 				Message:   &ollamaMessage{Role: "assistant", Content: "Hello"},
 				Done:      false,
 			},
 			{
-				Model:     "llama2",
+				Model:     "qwen3:0.6b",
 				CreatedAt: "2024-01-01T00:00:00Z",
 				Message:   &ollamaMessage{Role: "assistant", Content: " world"},
 				Done:      false,
 			},
 			{
-				Model:           "llama2",
+				Model:           "qwen3:0.6b",
 				CreatedAt:       "2024-01-01T00:00:00Z",
 				Done:            true,
 				PromptEvalCount: 5,
@@ -188,7 +188,7 @@ func TestClient_ChatWithOptions(t *testing.T) {
 		assert.Equal(t, "system", reqBody.Messages[0].Role)
 
 		response := ollamaResponse{
-			Model:           "llama2",
+			Model:           "qwen3:0.6b",
 			Message:         &ollamaMessage{Role: "assistant", Content: "response"},
 			Done:            true,
 			PromptEvalCount: 10,

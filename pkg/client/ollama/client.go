@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
 	"github.com/DotNetAge/gochat/pkg/client/base"
 	"github.com/DotNetAge/gochat/pkg/core"
@@ -74,16 +73,16 @@ type ollamaResponse struct {
 // New creates a new Ollama client
 func New(config Config) (*Client, error) {
 	if config.Model == "" {
-		config.Model = "llama2"
+		config.Model = "qwen3.5:0.8b"
 	}
 
 	if config.BaseURL == "" {
 		config.BaseURL = "http://localhost:11434"
 	}
 
-	if config.Timeout == 0 {
-		config.Timeout = 60 * time.Second // Ollama needs longer timeout
-	}
+	// if config.Timeout == 0 {
+	// 	config.Timeout = 60 * time.Second // Ollama needs longer timeout
+	// }
 
 	baseClient := base.New(config.Config)
 
