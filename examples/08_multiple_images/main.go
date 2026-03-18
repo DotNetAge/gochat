@@ -4,8 +4,9 @@
 // comparison, analysis, or batch processing.
 //
 // To run:
-//   export OPENAI_API_KEY="your-key-here"
-//   go run examples/08_multiple_images/main.go image1.jpg image2.jpg image3.jpg
+//
+//	export OPENAI_API_KEY="your-key-here"
+//	go run examples/08_multiple_images/main.go image1.jpg image2.jpg image3.jpg
 package main
 
 import (

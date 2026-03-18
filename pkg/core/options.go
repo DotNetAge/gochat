@@ -11,9 +11,9 @@ type Options struct {
 	SystemPrompt   string // prepended as system message if set
 	Thinking       bool   // enables extended thinking/reasoning (provider-dependent)
 	ThinkingBudget int    // max tokens for thinking (0 = provider default)
-	EnableSearch   bool     // Qwen/compatible-mode search
+	EnableSearch   bool   // Qwen/compatible-mode search
 	UsageCallback  func(Usage)
-	Attachments []Attachment
+	Attachments    []Attachment
 }
 
 // Option is a functional option for Chat/ChatStream

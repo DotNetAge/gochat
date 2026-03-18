@@ -62,7 +62,7 @@ func TestState(t *testing.T) {
 	val2Clone, _ := clone.Get("key2")
 	assert.Equal(t, 123, val2Clone)
 	clone.Set("key2", 456)
-	
+
 	val2Original, _ := s.Get("key2")
 	assert.Equal(t, 123, val2Original)
 }
@@ -127,7 +127,7 @@ func TestPipeline_ContextCancel(t *testing.T) {
 
 	step1 := new(MockStep)
 	step1.On("Name").Return("step1").Maybe()
-	
+
 	cancel() // Cancel before execution
 
 	p.AddStep(step1)
@@ -154,10 +154,10 @@ func (s *MyTypedStep) Execute(ctx context.Context, state *MyTypedContext) error 
 func TestPipeline_StronglyTyped(t *testing.T) {
 	ctx := context.Background()
 	state := &MyTypedContext{Input: "test"}
-	
+
 	p := New[*MyTypedContext]()
 	p.AddStep(&MyTypedStep{})
-	
+
 	err := p.Execute(ctx, state)
 	assert.NoError(t, err)
 	assert.Equal(t, "test processed", state.Output)

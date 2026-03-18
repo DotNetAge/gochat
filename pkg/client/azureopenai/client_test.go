@@ -70,7 +70,7 @@ func TestClient_ChatStream(t *testing.T) {
 	defer server.Close()
 
 	client, _ := New(Config{
-		Config: base.Config{APIKey: "key", Model: deployment},
+		Config:   base.Config{APIKey: "key", Model: deployment},
 		Endpoint: server.URL,
 	})
 
@@ -95,7 +95,7 @@ func TestClient_ChatStream_Error_Response(t *testing.T) {
 	defer server.Close()
 
 	client, _ := New(Config{
-		Config: base.Config{APIKey: "key", Model: "deploy"},
+		Config:   base.Config{APIKey: "key", Model: "deploy"},
 		Endpoint: server.URL,
 	})
 
@@ -120,7 +120,7 @@ func TestClient_Options(t *testing.T) {
 	defer server.Close()
 
 	client, _ := New(Config{
-		Config: base.Config{APIKey: "key", Model: "deploy"},
+		Config:   base.Config{APIKey: "key", Model: "deploy"},
 		Endpoint: server.URL,
 	})
 
@@ -146,7 +146,7 @@ func TestClient_ResolveModel(t *testing.T) {
 	defer server.Close()
 
 	client, _ := New(Config{
-		Config: base.Config{APIKey: "key", Model: "default-model"},
+		Config:   base.Config{APIKey: "key", Model: "default-model"},
 		Endpoint: server.URL,
 	})
 
@@ -162,7 +162,7 @@ func TestClient_ErrorHandling(t *testing.T) {
 	defer server.Close()
 
 	client, _ := New(Config{
-		Config: base.Config{APIKey: "key", Model: "deploy"},
+		Config:   base.Config{APIKey: "key", Model: "deploy"},
 		Endpoint: server.URL,
 	})
 

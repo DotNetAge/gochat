@@ -5,8 +5,9 @@
 // and send it as a text message.
 //
 // To run:
-//   export OPENAI_API_KEY="your-key-here"
-//   go run examples/07_document_analysis/main.go path/to/document.txt
+//
+//	export OPENAI_API_KEY="your-key-here"
+//	go run examples/07_document_analysis/main.go path/to/document.txt
 package main
 
 import (

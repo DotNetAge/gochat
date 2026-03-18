@@ -4,8 +4,9 @@
 // the model to invoke external functions and use their results.
 //
 // To run:
-//   export OPENAI_API_KEY="your-key-here"
-//   go run examples/04_tool_calling/main.go
+//
+//	export OPENAI_API_KEY="your-key-here"
+//	go run examples/04_tool_calling/main.go
 package main
 
 import (

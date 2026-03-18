@@ -13,7 +13,7 @@ import (
 
 func TestOllama(t *testing.T) {
 	fmt.Println("=== Ollama Integration Test (Model: qwen3:1.7b) ===")
-	
+
 	client, err := ollama.New(ollama.Config{
 		Config: base.Config{
 			Model:   "qwen3:1.7b",

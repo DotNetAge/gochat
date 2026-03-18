@@ -15,7 +15,7 @@ import (
 const (
 	// QwenPortalModelCoder is the model used for coding tasks in the portal.
 	QwenPortalModelCoder = "coder-model"
-	
+
 	// QwenPortalModelVision is the multimodal model used in the portal.
 	QwenPortalModelVision = "vision-model"
 

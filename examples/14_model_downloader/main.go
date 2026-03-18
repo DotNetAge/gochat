@@ -25,7 +25,7 @@ func main() {
 
 	modelName := "bge-small-zh-v1.5"
 	fmt.Printf("Downloading model: %s\n", modelName)
-	
+
 	modelPath, err := dl.DownloadModel(modelName, func(modelName, fileName string, downloaded, total int64) {
 		if total > 0 {
 			percentage := float64(downloaded) / float64(total) * 100
@@ -34,7 +34,7 @@ func main() {
 			fmt.Printf("[%s] %s: %d bytes downloaded\n", modelName, fileName, downloaded)
 		}
 	})
-	
+
 	if err != nil {
 		log.Fatalf("Failed to download model: %v", err)
 	}

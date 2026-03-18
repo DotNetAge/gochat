@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
 	"net/http"
+	"strings"
 
 	"github.com/DotNetAge/gochat/pkg/client/base"
 	"github.com/DotNetAge/gochat/pkg/client/openaicompat"
@@ -101,13 +101,13 @@ func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts .
 	// Build request
 	model := c.resolveModel(options)
 	reqBody := openaicompat.ChatCompletionRequest{
-		Model:       model,
-		Messages:    openaicompat.MessagesToWire(messages, options.SystemPrompt),
-		Temperature: c.resolveTemperature(options),
-		MaxTokens:   c.resolveMaxTokens(options),
-		TopP:        c.resolveTopP(options),
-		Stop:        options.Stop,
-		Stream:      true,
+		Model:        model,
+		Messages:     openaicompat.MessagesToWire(messages, options.SystemPrompt),
+		Temperature:  c.resolveTemperature(options),
+		MaxTokens:    c.resolveMaxTokens(options),
+		TopP:         c.resolveTopP(options),
+		Stop:         options.Stop,
+		Stream:       true,
 		EnableSearch: options.EnableSearch,
 	}
 
@@ -190,13 +190,13 @@ func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts .
 func (c *Client) doChat(ctx context.Context, messages []core.Message, options core.Options, stream bool) (*core.Response, error) {
 	model := c.resolveModel(options)
 	reqBody := openaicompat.ChatCompletionRequest{
-		Model:       model,
-		Messages:    openaicompat.MessagesToWire(messages, options.SystemPrompt),
-		Temperature: c.resolveTemperature(options),
-		MaxTokens:   c.resolveMaxTokens(options),
-		TopP:        c.resolveTopP(options),
-		Stop:        options.Stop,
-		Stream:      stream,
+		Model:        model,
+		Messages:     openaicompat.MessagesToWire(messages, options.SystemPrompt),
+		Temperature:  c.resolveTemperature(options),
+		MaxTokens:    c.resolveMaxTokens(options),
+		TopP:         c.resolveTopP(options),
+		Stop:         options.Stop,
+		Stream:       stream,
 		EnableSearch: options.EnableSearch,
 	}
 

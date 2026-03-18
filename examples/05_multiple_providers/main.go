@@ -5,9 +5,10 @@
 // to switch between them.
 //
 // To run:
-//   export OPENAI_API_KEY="your-openai-key"
-//   export ANTHROPIC_API_KEY="your-anthropic-key"
-//   go run examples/05_multiple_providers/main.go
+//
+//	export OPENAI_API_KEY="your-openai-key"
+//	export ANTHROPIC_API_KEY="your-anthropic-key"
+//	go run examples/05_multiple_providers/main.go
 package main
 
 import (

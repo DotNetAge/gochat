@@ -31,7 +31,7 @@ func (m *mockAuthProvider) RefreshToken(refreshToken string) (*OAuthToken, error
 
 // mockTokenStore 模拟令牌存储
 type mockTokenStore struct {
-	token  *OAuthToken
+	token   *OAuthToken
 	saveErr error
 	loadErr error
 }
@@ -48,9 +48,9 @@ func (m *mockTokenStore) Load() (*OAuthToken, error) {
 func TestAuthManager_Login(t *testing.T) {
 	// 测试正常登录
 	token := &OAuthToken{
-		Access:      "test-token",
-		Refresh:     "test-refresh",
-		Expires:     time.Now().Add(1 * time.Hour).UnixMilli(),
+		Access:  "test-token",
+		Refresh: "test-refresh",
+		Expires: time.Now().Add(1 * time.Hour).UnixMilli(),
 	}
 
 	provider := &mockAuthProvider{
@@ -76,9 +76,9 @@ func TestAuthManager_Login(t *testing.T) {
 func TestAuthManager_LoadToken(t *testing.T) {
 	// 测试加载令牌
 	token := &OAuthToken{
-		Access:      "test-token",
-		Refresh:     "test-refresh",
-		Expires:     time.Now().Add(1 * time.Hour).UnixMilli(),
+		Access:  "test-token",
+		Refresh: "test-refresh",
+		Expires: time.Now().Add(1 * time.Hour).UnixMilli(),
 	}
 
 	store := &mockTokenStore{
@@ -108,9 +108,9 @@ func TestAuthManager_LoadToken(t *testing.T) {
 func TestAuthManager_GetToken(t *testing.T) {
 	// 测试获取有效令牌
 	token := &OAuthToken{
-		Access:      "test-token",
-		Refresh:     "test-refresh",
-		Expires:     time.Now().Add(1 * time.Hour).UnixMilli(),
+		Access:  "test-token",
+		Refresh: "test-refresh",
+		Expires: time.Now().Add(1 * time.Hour).UnixMilli(),
 	}
 
 	store := &mockTokenStore{
@@ -131,15 +131,15 @@ func TestAuthManager_GetToken(t *testing.T) {
 
 	// 测试令牌过期自动刷新
 	expiredToken := &OAuthToken{
-		Access:      "expired-token",
-		Refresh:     "test-refresh",
-		Expires:     time.Now().Add(-1 * time.Hour).UnixMilli(),
+		Access:  "expired-token",
+		Refresh: "test-refresh",
+		Expires: time.Now().Add(-1 * time.Hour).UnixMilli(),
 	}
 
 	newToken := &OAuthToken{
-		Access:      "new-token",
-		Refresh:     "new-refresh",
-		Expires:     time.Now().Add(1 * time.Hour).UnixMilli(),
+		Access:  "new-token",
+		Refresh: "new-refresh",
+		Expires: time.Now().Add(1 * time.Hour).UnixMilli(),
 	}
 
 	store2 := &mockTokenStore{
@@ -159,9 +159,9 @@ func TestAuthManager_GetToken(t *testing.T) {
 
 	// 测试刷新令牌失败
 	expiredToken2 := &OAuthToken{
-		Access:      "expired-token-2",
-		Refresh:     "test-refresh-2",
-		Expires:     time.Now().Add(-1 * time.Hour).UnixMilli(),
+		Access:  "expired-token-2",
+		Refresh: "test-refresh-2",
+		Expires: time.Now().Add(-1 * time.Hour).UnixMilli(),
 	}
 
 	store3 := &mockTokenStore{
@@ -169,8 +169,8 @@ func TestAuthManager_GetToken(t *testing.T) {
 	}
 
 	provider3 := &mockAuthProvider{
-		name:         "test-provider",
-		refreshErr:   assert.AnError,
+		name:       "test-provider",
+		refreshErr: assert.AnError,
 	}
 
 	manager3 := NewAuthManagerWithStore(provider3, store3)

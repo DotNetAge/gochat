@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"testing"
 	"os"
+	"testing"
 
 	"github.com/DotNetAge/gochat/pkg/client/base"
 	"github.com/DotNetAge/gochat/pkg/client/compatible"
@@ -19,7 +19,7 @@ func TestQWen(t *testing.T) {
 	}
 
 	fmt.Println("=== Aliyun QWen Integration Test (Model: qwen-max) ===")
-	
+
 	client, err := compatible.New(compatible.Config{
 		Config: base.Config{
 			APIKey:  apiKey,
@@ -32,7 +32,7 @@ func TestQWen(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	
+
 	fmt.Println("\n--- Testing QWen with Web Search Enabled ---")
 	messages := []core.Message{
 		core.NewUserMessage("今天最新的纳斯达克三大股指表现如何？"),

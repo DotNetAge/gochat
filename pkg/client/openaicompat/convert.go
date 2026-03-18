@@ -157,11 +157,11 @@ func ResponseFromWire(resp *ChatCompletionResponse) *core.Response {
 	}
 
 	return &core.Response{
-		ID:           resp.ID,
-		Model:        resp.Model,
-		Content:      content,
+		ID:               resp.ID,
+		Model:            resp.Model,
+		Content:          content,
 		ReasoningContent: choice.Message.ReasoningContent,
-		FinishReason: choice.FinishReason,
+		FinishReason:     choice.FinishReason,
 		Message: core.Message{
 			Role:      choice.Message.Role,
 			Content:   contentBlocks,

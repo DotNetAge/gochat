@@ -33,7 +33,7 @@ func TestGenerateCompletionStep(t *testing.T) {
 	resp := &core.Response{
 		Content: "world",
 	}
-	
+
 	// Expectations
 	mockClient.On("Chat", ctx, mock.Anything, mock.Anything).Return(resp, nil)
 

@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
@@ -56,6 +57,10 @@ func (p *Pipeline[T]) Execute(ctx context.Context, state T) error {
 		err := step.Execute(ctx, state)
 
 		if err != nil {
+			if errors.Is(err, ErrReturn) {
+				return nil // 优雅退出
+			}
+
 			// Trigger OnStepError hooks
 			for _, hook := range p.hooks {
 				hook.OnStepError(ctx, step, state, err)

@@ -4,32 +4,32 @@ import "encoding/json"
 
 // ChatCompletionRequest represents the OpenAI-compatible chat completion request
 type ChatCompletionRequest struct {
-	Model       string      `json:"model"`
-	Messages    []Message   `json:"messages"`
-	Temperature float64     `json:"temperature,omitempty"`
-	MaxTokens   int         `json:"max_tokens,omitempty"`
-	TopP        float64     `json:"top_p,omitempty"`
-	Stop        []string    `json:"stop,omitempty"`
-	Stream          bool        `json:"stream,omitempty"`
-	ReasoningEffort string      `json:"reasoning_effort,omitempty"` // for OpenAI o1/o3
-	EnableSearch    bool        `json:"enable_search,omitempty"`
-	Tools       []Tool      `json:"tools,omitempty"`
+	Model           string    `json:"model"`
+	Messages        []Message `json:"messages"`
+	Temperature     float64   `json:"temperature,omitempty"`
+	MaxTokens       int       `json:"max_tokens,omitempty"`
+	TopP            float64   `json:"top_p,omitempty"`
+	Stop            []string  `json:"stop,omitempty"`
+	Stream          bool      `json:"stream,omitempty"`
+	ReasoningEffort string    `json:"reasoning_effort,omitempty"` // for OpenAI o1/o3
+	EnableSearch    bool      `json:"enable_search,omitempty"`
+	Tools           []Tool    `json:"tools,omitempty"`
 }
 
 // Message represents a message in the OpenAI wire format
 type Message struct {
-	Role       string      `json:"role"`
+	Role             string      `json:"role"`
 	Content          interface{} `json:"content"` // string or []ContentPart
 	ReasoningContent string      `json:"reasoning_content,omitempty"`
-	ToolCalls  []ToolCall  `json:"tool_calls,omitempty"`
-	ToolCallID string      `json:"tool_call_id,omitempty"`
+	ToolCalls        []ToolCall  `json:"tool_calls,omitempty"`
+	ToolCallID       string      `json:"tool_call_id,omitempty"`
 }
 
 // ContentPart represents a part of multimodal content
 type ContentPart struct {
-	Type     string     `json:"type"` // "text" or "image_url"
-	Text     string     `json:"text,omitempty"`
-	ImageURL *ImageURL  `json:"image_url,omitempty"`
+	Type     string    `json:"type"` // "text" or "image_url"
+	Text     string    `json:"text,omitempty"`
+	ImageURL *ImageURL `json:"image_url,omitempty"`
 }
 
 // ImageURL represents an image URL or data
@@ -102,10 +102,10 @@ type StreamChoice struct {
 
 // Delta represents incremental content in streaming
 type Delta struct {
-	Role      string     `json:"role,omitempty"`
+	Role             string     `json:"role,omitempty"`
 	Content          string     `json:"content,omitempty"`
 	ReasoningContent string     `json:"reasoning_content,omitempty"`
-	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+	ToolCalls        []ToolCall `json:"tool_calls,omitempty"`
 }
 
 // ErrorResponse represents an error response

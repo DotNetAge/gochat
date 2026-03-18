@@ -50,14 +50,14 @@ type anthropicMessage struct {
 }
 
 type contentBlock struct {
-	Type   string                 `json:"type"` // "text", "image", "tool_use", "tool_result"
-	Text   string                 `json:"text,omitempty"`
-	Source *imageSource           `json:"source,omitempty"`
-	ID     string                 `json:"id,omitempty"`
-	Name   string                 `json:"name,omitempty"`
-	Input  map[string]interface{} `json:"input,omitempty"`
-	Thinking string `json:"thinking,omitempty"`
-	Signature string `json:"signature,omitempty"`
+	Type      string                 `json:"type"` // "text", "image", "tool_use", "tool_result"
+	Text      string                 `json:"text,omitempty"`
+	Source    *imageSource           `json:"source,omitempty"`
+	ID        string                 `json:"id,omitempty"`
+	Name      string                 `json:"name,omitempty"`
+	Input     map[string]interface{} `json:"input,omitempty"`
+	Thinking  string                 `json:"thinking,omitempty"`
+	Signature string                 `json:"signature,omitempty"`
 }
 
 type imageSource struct {
@@ -82,13 +82,13 @@ type anthropicRequest struct {
 }
 
 type anthropicResponse struct {
-	ID           string         `json:"id"`
-	Type         string         `json:"type"`
-	Role         string         `json:"role"`
-	Content      []contentBlock `json:"content"`
-	Model        string         `json:"model"`
-	StopReason   string         `json:"stop_reason"`
-	Usage        anthropicUsage `json:"usage"`
+	ID         string         `json:"id"`
+	Type       string         `json:"type"`
+	Role       string         `json:"role"`
+	Content    []contentBlock `json:"content"`
+	Model      string         `json:"model"`
+	StopReason string         `json:"stop_reason"`
+	Usage      anthropicUsage `json:"usage"`
 }
 
 type anthropicUsage struct {
@@ -97,16 +97,16 @@ type anthropicUsage struct {
 }
 
 type streamChunk struct {
-	Type         string         `json:"type"`
-	Index        int            `json:"index,omitempty"`
-	Delta        *streamDelta   `json:"delta,omitempty"`
-	ContentBlock *contentBlock  `json:"content_block,omitempty"`
+	Type         string          `json:"type"`
+	Index        int             `json:"index,omitempty"`
+	Delta        *streamDelta    `json:"delta,omitempty"`
+	ContentBlock *contentBlock   `json:"content_block,omitempty"`
 	Usage        *anthropicUsage `json:"usage,omitempty"`
 }
 
 type streamDelta struct {
-	Type string `json:"type"`
-	Text string `json:"text,omitempty"`
+	Type     string `json:"type"`
+	Text     string `json:"text,omitempty"`
 	Thinking string `json:"thinking,omitempty"`
 }
 
@@ -338,13 +338,13 @@ func (c *Client) buildRequest(messages []core.Message, options core.Options, str
 	}
 
 	req := anthropicRequest{
-		Model:       c.resolveModel(options),
-		Messages:    anthropicMessages,
-		System:      systemPrompt,
-		MaxTokens:   maxTokens,
-		Stream:      stream,
+		Model:     c.resolveModel(options),
+		Messages:  anthropicMessages,
+		System:    systemPrompt,
+		MaxTokens: maxTokens,
+		Stream:    stream,
 	}
-	
+
 	if options.Thinking {
 		budget := options.ThinkingBudget
 		if budget < 1024 {
@@ -424,11 +424,11 @@ func (c *Client) convertResponse(resp *anthropicResponse) *core.Response {
 	}
 
 	return &core.Response{
-		ID:           resp.ID,
-		Model:        resp.Model,
-		Content:      content,
+		ID:               resp.ID,
+		Model:            resp.Model,
+		Content:          content,
 		ReasoningContent: reasoningContent,
-		FinishReason: resp.StopReason,
+		FinishReason:     resp.StopReason,
 		Message: core.Message{
 			Role:    resp.Role,
 			Content: contentBlocks,

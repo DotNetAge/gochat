@@ -28,7 +28,7 @@ const (
 	ContentTypeText ContentType = "text"
 
 	// ContentTypeImage is for image content (base64-encoded).
-	ContentTypeImage ContentType = "image"
+	ContentTypeImage    ContentType = "image"
 	ContentTypeImageURL ContentType = "image_url"
 
 	// ContentTypeFile is for file attachments.
@@ -73,8 +73,7 @@ type ContentBlock struct {
 
 	// Data is the base64-encoded content (only for ContentTypeImage/ContentTypeFile).
 	Data string `json:"data,omitempty"`
-	URL string `json:"url,omitempty"`
-
+	URL  string `json:"url,omitempty"`
 
 	// FileName is the original filename (only for ContentTypeFile).
 	FileName string `json:"file_name,omitempty"`

@@ -76,9 +76,9 @@ func TestToolCalling(t *testing.T) {
 
 	tools := []core.Tool{
 		{
-			Name: "get_weather",
+			Name:        "get_weather",
 			Description: "获取指定城市的天气情况",
-			Parameters: json.RawMessage(`{"type": "object", "properties": {"city": {"type": "string", "description": "城市名称，例如：杭州、北京"}}, "required": ["city"]}`),
+			Parameters:  json.RawMessage(`{"type": "object", "properties": {"city": {"type": "string", "description": "城市名称，例如：杭州、北京"}}, "required": ["city"]}`),
 		},
 	}
 
@@ -87,7 +87,7 @@ func TestToolCalling(t *testing.T) {
 	}
 
 	fmt.Println("User: 杭州今天天气怎么样？")
-	
+
 	resp, err := client.Chat(ctx, messages, core.WithTools(tools...))
 	if err != nil {
 		t.Fatalf("Chat request failed: %v", err)
@@ -106,7 +106,7 @@ func TestToolCalling(t *testing.T) {
 	fmt.Printf("--> Function returned: %s\n", mockWeatherResult)
 
 	messages = append(messages, core.Message{
-		Role: core.RoleAssistant,
+		Role:      core.RoleAssistant,
 		ToolCalls: []core.ToolCall{tc},
 	})
 
@@ -137,7 +137,7 @@ func TestDeepThinking(t *testing.T) {
 	}
 
 	fmt.Println("User: 10个橘子，我吃了一个，送给朋友两个，还剩几个？请一步步推导。")
-	
+
 	stream, err := client.ChatStream(ctx, messages, core.WithThinking(0))
 	if err != nil {
 		t.Fatalf("Stream request failed: %v", err)
@@ -170,7 +170,6 @@ func TestDeepThinking(t *testing.T) {
 	fmt.Println("\n\n=== Deep Thinking Test Completed ===")
 }
 
-
 // 4. 测试文本文件读取与内容分析 (Document Reading & Analysis)
 func TestDocumentReading(t *testing.T) {
 	fmt.Println("\n=== Test 4: Document Reading & Analysis (Model: qwen-plus) ===")
@@ -202,14 +201,14 @@ func TestDocumentReading(t *testing.T) {
 
 	// 3. 构建给大模型的消息
 	prompt := fmt.Sprintf("请阅读以下名为 '%s' 的文件内容，并用一句话总结它的核心目标：\n\n<file_content>\n%s\n</file_content>", tempFile, string(contentBytes))
-	
+
 	messages := []core.Message{
 		core.NewSystemMessage("你是一个专业的文件阅读与内容总结助手。"),
 		core.NewUserMessage(prompt),
 	}
 
 	fmt.Printf("User: 请阅读文件 '%s' 并一句话总结。\n", tempFile)
-	
+
 	// 4. 发送给大模型进行分析
 	resp, err := client.Chat(ctx, messages)
 	if err != nil {

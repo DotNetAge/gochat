@@ -4,8 +4,9 @@
 // and getting a response.
 //
 // To run:
-//   export OPENAI_API_KEY="your-key-here"
-//   go run examples/01_basic_chat/main.go
+//
+//	export OPENAI_API_KEY="your-key-here"
+//	go run examples/01_basic_chat/main.go
 package main
 
 import (

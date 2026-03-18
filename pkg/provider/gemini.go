@@ -60,12 +60,12 @@ func (p *GeminiProvider) Authenticate() (*core.OAuthToken, error) {
 	errChan := make(chan error)
 
 	mux := http.NewServeMux()
-	
+
 	callbackURL, err := url.Parse(p.CallbackURL)
 	if err != nil {
 		return nil, fmt.Errorf("invalid callback URL: %v", err)
 	}
-	
+
 	mux.HandleFunc(callbackURL.Path, func(w http.ResponseWriter, r *http.Request) {
 		code := r.URL.Query().Get("code")
 		if code == "" {
@@ -85,7 +85,7 @@ func (p *GeminiProvider) Authenticate() (*core.OAuthToken, error) {
 			errChan <- fmt.Errorf("local server error: %v", err)
 		}
 	}()
-	
+
 	// 确保退出时关闭服务器
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

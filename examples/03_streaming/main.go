@@ -5,8 +5,9 @@
 // for long responses.
 //
 // To run:
-//   export OPENAI_API_KEY="your-key-here"
-//   go run examples/03_streaming/main.go
+//
+//	export OPENAI_API_KEY="your-key-here"
+//	go run examples/03_streaming/main.go
 package main
 
 import (

@@ -1,7 +1,7 @@
 package main
 
 import (
-		"fmt"
+	"fmt"
 	"sync"
 	"testing"
 
@@ -21,7 +21,7 @@ type MemoryTokenStore struct {
 func (s *MemoryTokenStore) Save(token *core.OAuthToken) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	s.token = token
 	fmt.Printf("[Custom Store] Token has been successfully SAVED to memory.\n")
 	return nil
@@ -30,7 +30,7 @@ func (s *MemoryTokenStore) Save(token *core.OAuthToken) error {
 func (s *MemoryTokenStore) Load() (*core.OAuthToken, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	
+
 	if s.token == nil {
 		fmt.Printf("[Custom Store] Attempted to load token, but it is empty.\n")
 		return nil, fmt.Errorf("no token in memory")
@@ -53,12 +53,12 @@ func TestCustomTokenStore(t *testing.T) {
 	mockToken := &core.OAuthToken{
 		Access:  "fake-expired-access",
 		Refresh: "-lAWdkeb5OPvRv1mW06QRACnCW2SPOnRvXe6XH1r4k28UdJu4UFryfO3l7uue8EhQ2JAzrbONUvvmgM2W56LyA",
-		Expires: 1000, 
+		Expires: 1000,
 	}
 	customStore.Save(mockToken)
 
 	fmt.Println("\n[Test] Getting token from AuthManager. It should detect expiration, load from CustomStore, attempt refresh...")
-	
+
 	token, err := authMgr.GetToken()
 	if err != nil {
 		fmt.Printf("Expected network error when refreshing fake token: %v\n", err)

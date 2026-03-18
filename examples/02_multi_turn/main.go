@@ -4,8 +4,9 @@
 // turns, allowing the model to remember context from previous messages.
 //
 // To run:
-//   export OPENAI_API_KEY="your-key-here"
-//   go run examples/02_multi_turn/main.go
+//
+//	export OPENAI_API_KEY="your-key-here"
+//	go run examples/02_multi_turn/main.go
 package main
 
 import (

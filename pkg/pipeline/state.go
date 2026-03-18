@@ -58,12 +58,12 @@ func (s *State) Delete(key string) {
 func (s *State) Clone() *State {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	
+
 	newData := make(map[string]interface{}, len(s.data))
 	for k, v := range s.data {
 		newData[k] = v
 	}
-	
+
 	return &State{
 		data: newData,
 	}

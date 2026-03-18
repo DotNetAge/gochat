@@ -10,11 +10,11 @@ import (
 
 // GenerateCompletionStep is a pipeline step that calls an LLM client to generate a completion.
 type GenerateCompletionStep struct {
-	client     core.Client
-	inputKey   string
-	outputKey  string
-	model      string
-	sysPrompt  string
+	client    core.Client
+	inputKey  string
+	outputKey string
+	model     string
+	sysPrompt string
 }
 
 // NewGenerateCompletionStep creates a new step to invoke an LLM.
@@ -58,7 +58,7 @@ func (s *GenerateCompletionStep) Execute(ctx context.Context, state *pipeline.St
 			Content: []core.ContentBlock{{Type: core.ContentTypeText, Text: s.sysPrompt}},
 		})
 	}
-	
+
 	messages = append(messages, core.Message{
 		Role:    core.RoleUser,
 		Content: []core.ContentBlock{{Type: core.ContentTypeText, Text: prompt}},

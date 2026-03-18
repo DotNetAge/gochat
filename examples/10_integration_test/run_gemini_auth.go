@@ -31,7 +31,7 @@ func main() {
 		if err := authMgr.Login(); err != nil {
 			log.Fatalf("[Error] Failed to login via standard OAuth2 flow: %v", err)
 		}
-		
+
 		token, err = authMgr.GetToken()
 		if err != nil {
 			log.Fatalf("[Error] Failed to get token after login: %v", err)

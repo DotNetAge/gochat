@@ -4,8 +4,9 @@
 // that support vision capabilities (GPT-4 Vision, Claude 3, etc.).
 //
 // To run:
-//   export OPENAI_API_KEY="your-key-here"
-//   go run examples/06_image_input/main.go path/to/image.jpg
+//
+//	export OPENAI_API_KEY="your-key-here"
+//	go run examples/06_image_input/main.go path/to/image.jpg
 package main
 
 import (
