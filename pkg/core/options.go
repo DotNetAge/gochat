@@ -13,6 +13,7 @@ type Options struct {
 	ThinkingBudget int    // max tokens for thinking (0 = provider default)
 	EnableSearch   bool     // Qwen/compatible-mode search
 	UsageCallback  func(Usage)
+	Attachments []Attachment
 }
 
 // Option is a functional option for Chat/ChatStream
@@ -65,6 +66,13 @@ func WithThinking(budget int) Option {
 func WithEnableSearch(enabled bool) Option {
 	return func(o *Options) {
 		o.EnableSearch = enabled
+	}
+}
+
+// WithAttachments attaches files or media to the message context
+func WithAttachments(attachments ...Attachment) Option {
+	return func(o *Options) {
+		o.Attachments = append(o.Attachments, attachments...)
 	}
 }
 

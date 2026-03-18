@@ -105,6 +105,7 @@ func DefaultOllamaClient() (*Client, error) {
 // Chat performs a non-streaming chat completion
 func (c *Client) Chat(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.Response, error) {
 	options := core.ApplyOptions(opts...)
+	messages = core.ProcessAttachments(messages, options.Attachments)
 
 	var response *core.Response
 	err := c.base.Retry(ctx, func() error {
@@ -130,6 +131,7 @@ func (c *Client) Chat(ctx context.Context, messages []core.Message, opts ...core
 // ChatStream performs a streaming chat completion
 func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.Stream, error) {
 	options := core.ApplyOptions(opts...)
+	messages = core.ProcessAttachments(messages, options.Attachments)
 
 	reqBody := c.buildRequest(messages, options, true)
 
