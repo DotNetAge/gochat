@@ -43,3 +43,20 @@ type Provider interface {
 	// - int: Embedding dimension
 	Dimension() int
 }
+
+
+// MultimodalProvider extends Provider with image embedding capabilities.
+type MultimodalProvider interface {
+	Provider
+
+	// EmbedImages generates embeddings for the given images.
+	//
+	// Parameters:
+	// - ctx: Context for cancellation and timeout
+	// - images: Slice of byte arrays, where each byte array is a raw image (JPEG/PNG)
+	//
+	// Returns:
+	// - [][]float32: Slice of embeddings, one for each image
+	// - error: Error if embedding generation fails
+	EmbedImages(ctx context.Context, images [][]byte) ([][]float32, error)
+}

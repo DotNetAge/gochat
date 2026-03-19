@@ -64,6 +64,8 @@ func NewProvider(modelPath string) (Provider, error) {
 		return NewBGEProvider(modelPath)
 	case ModelTypeSentenceBERT:
 		return NewSentenceBERTProvider(modelPath)
+	case ModelTypeCLIP:
+		return NewCLIPProvider(modelPath)
 	default:
 		// Create generic provider for BERT and other model types
 		model, err := NewModel(info.Dimension, modelPath)
@@ -135,4 +137,39 @@ func WithBERT(modelName, modelPath string) (Provider, error) {
 
 	// 创建 Provider
 	return NewProvider(modelPath)
+}
+
+
+// WithCLIP 创建 CLIP Multimodal Embedding Provider
+// modelName: 模型名称，例如 "clip-vit-base-patch32"
+// modelPath: 模型路径，如果为空则自动下载
+func WithCLIP(modelName, modelPath string) (MultimodalProvider, error) {
+	if modelPath == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			homeDir = "."
+		}
+		modelPath = filepath.Join(homeDir, ".embedding", modelName)
+	}
+
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		fmt.Printf("Model not found, downloading %s to %s...\n", modelName, modelPath)
+		downloader := NewDownloader("")
+		_, downloadErr := downloader.DownloadModel(modelName, nil)
+		if downloadErr != nil {
+			return nil, fmt.Errorf("failed to download model: %w", downloadErr)
+		}
+		fmt.Println("Model downloaded successfully")
+	}
+
+	p, err := NewProvider(modelPath)
+	if err != nil {
+		return nil, err
+	}
+	
+	mp, ok := p.(MultimodalProvider)
+	if !ok {
+		return nil, fmt.Errorf("provider is not multimodal")
+	}
+	return mp, nil
 }

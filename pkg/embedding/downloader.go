@@ -103,6 +103,16 @@ func (d *Downloader) GetModelInfo() []DownloadModelInfo {
 			Description: "Chinese BGE base model for embedding",
 		},
 		{
+			Name: "clip-vit-base-patch32",
+			Type: "clip",
+			URLs: []string{
+				"https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/text_model_fp16.onnx",
+				"https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model_fp16.onnx",
+			},
+			Size:        "~300MB",
+			Description: "OpenAI CLIP base model for text and image multimodal embeddings",
+		},
+		{
 			Name: "all-mpnet-base-v2",
 			Type: "sentence-bert",
 			URLs: []string{

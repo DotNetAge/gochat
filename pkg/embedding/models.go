@@ -24,6 +24,8 @@ const (
 	ModelTypeFastText ModelType = "fasttext"
 	// ModelTypeGloVe represents GloVe models
 	ModelTypeGloVe ModelType = "glove"
+	// ModelTypeCLIP represents CLIP models
+	ModelTypeCLIP ModelType = "clip"
 )
 
 // ModelInfo contains information about a model including its type, name, and dimensions.
@@ -69,6 +71,9 @@ func NewModelInfo(modelPath string) (*ModelInfo, error) {
 	case strings.Contains(lowerName, "glove"):
 		modelType = ModelTypeGloVe
 		dimension = 300 // Default for GloVe
+	case strings.Contains(lowerName, "clip"):
+		modelType = ModelTypeCLIP
+		dimension = 512 // Default for CLIP
 	default:
 		return nil, fmt.Errorf("unknown model type for file: %s", modelName)
 	}
