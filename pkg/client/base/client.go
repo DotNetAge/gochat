@@ -36,10 +36,6 @@ func New(config Config) *Client {
 		config.MaxRetries = 3
 	}
 
-	if config.Temperature == 0 {
-		config.Temperature = 0.7
-	}
-
 	return &Client{
 		config: config,
 		httpClient: &http.Client{

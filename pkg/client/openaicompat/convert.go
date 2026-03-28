@@ -42,22 +42,23 @@ func MessagesToWire(messages []core.Message, systemPrompt string) []Message {
 						Type: "text",
 						Text: block.Text,
 					})
-				case core.ContentTypeImage:
-				case core.ContentTypeImageURL:
-					parts = append(parts, ContentPart{
-						Type: "image_url",
-						ImageURL: &ImageURL{
-							URL: block.URL,
-						},
-					})
-					// Convert to data URL format
-					dataURL := fmt.Sprintf("data:%s;base64,%s", block.MediaType, block.Data)
-					parts = append(parts, ContentPart{
-						Type: "image_url",
-						ImageURL: &ImageURL{
-							URL: dataURL,
-						},
-					})
+				case core.ContentTypeImage, core.ContentTypeImageURL:
+					if block.URL != "" {
+						parts = append(parts, ContentPart{
+							Type: "image_url",
+							ImageURL: &ImageURL{
+								URL: block.URL,
+							},
+						})
+					} else if block.Data != "" {
+						dataURL := fmt.Sprintf("data:%s;base64,%s", block.MediaType, block.Data)
+						parts = append(parts, ContentPart{
+							Type: "image_url",
+							ImageURL: &ImageURL{
+								URL: dataURL,
+							},
+						})
+					}
 				}
 			}
 			wireMsg.Content = parts

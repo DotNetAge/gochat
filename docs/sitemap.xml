@@ -57,6 +57,13 @@
         <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/modules/provider/"/>
     </url>
     <url>
+        <loc>Nonerelease-notes/v0.1.10/</loc>
+        <lastmod>2026-03-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonerelease-notes/v0.1.10/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/release-notes/v0.1.10/"/>
+    </url>
+    <url>
         <loc>Nonezh/</loc>
         <lastmod>2026-03-28</lastmod>
         <changefreq>daily</changefreq>
@@ -111,5 +118,12 @@
         <changefreq>daily</changefreq>
         <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/modules/provider/"/>
         <xhtml:link rel="alternate" hreflang="en" href="Nonemodules/provider/"/>
+    </url>
+    <url>
+        <loc>Nonezh/release-notes/v0.1.10/</loc>
+        <lastmod>2026-03-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/release-notes/v0.1.10/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonerelease-notes/v0.1.10/"/>
     </url>
 </urlset>

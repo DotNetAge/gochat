@@ -92,8 +92,8 @@ func (s *EmbedSingleStep) Name() string {
 }
 
 func (s *EmbedSingleStep) Execute(ctx context.Context, state *pipeline.State) error {
-	text := state.GetString(s.inputKey)
-	if text == "" {
+	text, ok := state.GetString(s.inputKey)
+	if !ok || text == "" {
 		return fmt.Errorf("missing or empty string at state key %q", s.inputKey)
 	}
 

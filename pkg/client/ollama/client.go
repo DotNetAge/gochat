@@ -155,7 +155,10 @@ func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts .
 
 	if resp.StatusCode != http.StatusOK {
 		defer resp.Body.Close()
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, core.NewNetworkError("failed to read error response", err)
+		}
 		return nil, core.NewAPIError(fmt.Sprintf("request failed with status %d: %s", resp.StatusCode, string(body)), nil)
 	}
 
@@ -237,7 +240,10 @@ func (c *Client) doChat(ctx context.Context, messages []core.Message, options co
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, core.NewNetworkError("failed to read error response", err)
+		}
 		return nil, core.NewAPIError(fmt.Sprintf("request failed with status %d: %s", resp.StatusCode, string(body)), nil)
 	}
 

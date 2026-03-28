@@ -20,9 +20,8 @@ func TestNewClient(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "qwen3.5:0.8b", client.base.Config().Model)
 		assert.Equal(t, "http://localhost:11434", client.base.Config().BaseURL)
-		// assert.Equal(t, 0, client.base.Config().Timeout)
 		assert.Equal(t, 3, client.base.Config().MaxRetries)
-		assert.Equal(t, 0.7, client.base.Config().Temperature)
+		assert.Equal(t, 0.0, client.base.Config().Temperature)
 	})
 
 	t.Run("Custom configuration", func(t *testing.T) {

@@ -47,12 +47,14 @@ func TestState(t *testing.T) {
 	val1, ok1 := s.Get("key1")
 	assert.True(t, ok1)
 	assert.Equal(t, "value1", val1)
-	assert.Equal(t, "value1", s.GetString("key1"))
+	val1Str, _ := s.GetString("key1")
+	assert.Equal(t, "value1", val1Str)
 
 	val2, ok2 := s.Get("key2")
 	assert.True(t, ok2)
 	assert.Equal(t, 123, val2)
-	assert.Equal(t, "", s.GetString("key2"))
+	val2Str, _ := s.GetString("key2")
+	assert.Equal(t, "", val2Str)
 
 	s.Delete("key1")
 	_, ok1 = s.Get("key1")

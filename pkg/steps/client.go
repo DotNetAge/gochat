@@ -29,8 +29,8 @@ func (s *ChatStep) Name() string {
 }
 
 func (s *ChatStep) Execute(ctx context.Context, state *pipeline.State) error {
-	prompt := state.GetString(s.inputKey)
-	if prompt == "" {
+	prompt, ok := state.GetString(s.inputKey)
+	if !ok || prompt == "" {
 		return fmt.Errorf("missing or empty string at state key %q", s.inputKey)
 	}
 
@@ -71,8 +71,8 @@ func (s *ChatStreamStep) Name() string {
 }
 
 func (s *ChatStreamStep) Execute(ctx context.Context, state *pipeline.State) error {
-	prompt := state.GetString(s.inputKey)
-	if prompt == "" {
+	prompt, ok := state.GetString(s.inputKey)
+	if !ok || prompt == "" {
 		return fmt.Errorf("missing or empty string at state key %q", s.inputKey)
 	}
 

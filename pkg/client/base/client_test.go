@@ -10,15 +10,13 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	// 测试默认值
 	config := Config{}
 	client := New(config)
 
 	assert.Equal(t, 30*time.Second, client.config.Timeout)
 	assert.Equal(t, 3, client.config.MaxRetries)
-	assert.Equal(t, 0.7, client.config.Temperature)
+	assert.Equal(t, 0.0, client.config.Temperature)
 
-	// 测试自定义值
 	customConfig := Config{
 		Timeout:     60 * time.Second,
 		MaxRetries:  5,

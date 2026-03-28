@@ -226,7 +226,8 @@ func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts .
 
 			var chunk streamChunk
 			if err := json.Unmarshal([]byte(data), &chunk); err != nil {
-				continue
+				ch <- core.StreamEvent{Type: core.EventError, Err: fmt.Errorf("failed to parse stream chunk: %w", err)}
+				return
 			}
 
 			// Handle different chunk types

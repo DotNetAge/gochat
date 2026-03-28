@@ -44,9 +44,8 @@ func (s *GenerateCompletionStep) Name() string {
 
 // Execute performs the LLM call.
 func (s *GenerateCompletionStep) Execute(ctx context.Context, state *pipeline.State) error {
-	// Read input
-	prompt := state.GetString(s.inputKey)
-	if prompt == "" {
+	prompt, ok := state.GetString(s.inputKey)
+	if !ok || prompt == "" {
 		return fmt.Errorf("missing or empty string at state key %q", s.inputKey)
 	}
 

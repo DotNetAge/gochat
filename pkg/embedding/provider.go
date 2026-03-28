@@ -77,7 +77,7 @@ func (p *LocalProvider) Embed(ctx context.Context, texts []string) ([][]float32,
 	}
 
 	// Process in batches
-	var allEmbeddings [][]float32
+	allEmbeddings := make([][]float32, 0, len(texts))
 	batchSize := p.config.MaxBatchSize
 
 	for i := 0; i < len(texts); i += batchSize {
@@ -101,6 +101,14 @@ func (p *LocalProvider) Embed(ctx context.Context, texts []string) ([][]float32,
 // Dimension returns the embedding dimension
 func (p *LocalProvider) Dimension() int {
 	return p.config.Dimension
+}
+
+// Close releases resources associated with the provider
+func (p *LocalProvider) Close() error {
+	if p.config.Model != nil {
+		return p.config.Model.Close()
+	}
+	return nil
 }
 
 // processBatch processes a batch of texts

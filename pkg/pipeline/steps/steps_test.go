@@ -42,7 +42,8 @@ func TestGenerateCompletionStep(t *testing.T) {
 
 	err := step.Execute(ctx, state)
 	assert.NoError(t, err)
-	assert.Equal(t, "world", state.GetString("output"))
+	outputStr, _ := state.GetString("output")
+	assert.Equal(t, "world", outputStr)
 
 	mockClient.AssertExpectations(t)
 }
@@ -57,5 +58,6 @@ func TestTemplateStep(t *testing.T) {
 
 	err := step.Execute(ctx, state)
 	assert.NoError(t, err)
-	assert.Equal(t, "Hello Gopher!", state.GetString("output"))
+	outputStr, _ := state.GetString("output")
+	assert.Equal(t, "Hello Gopher!", outputStr)
 }
