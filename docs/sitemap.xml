@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+    <url>
+        <loc>None./</loc>
+        <lastmod>2026-03-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="None"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/"/>
+    </url>
+    <url>
+        <loc>Noneapi_reference/</loc>
+        <lastmod>2026-03-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Noneapi_reference/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/api_reference/"/>
+    </url>
+    <url>
+        <loc>Nonequickstart/</loc>
+        <lastmod>2026-03-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonequickstart/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/quickstart/"/>
+    </url>
+    <url>
+        <loc>Nonemodules/client/</loc>
+        <lastmod>2026-03-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonemodules/client/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/modules/client/"/>
+    </url>
+    <url>
+        <loc>Nonemodules/core/</loc>
+        <lastmod>2026-03-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonemodules/core/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/modules/core/"/>
+    </url>
+    <url>
+        <loc>Nonemodules/embedding/</loc>
+        <lastmod>2026-03-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonemodules/embedding/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/modules/embedding/"/>
+    </url>
+    <url>
+        <loc>Nonemodules/pipeline/</loc>
+        <lastmod>2026-03-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonemodules/pipeline/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/modules/pipeline/"/>
+    </url>
+    <url>
+        <loc>Nonemodules/provider/</loc>
+        <lastmod>2026-03-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonemodules/provider/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/modules/provider/"/>
+    </url>
+    <url>
+        <loc>Nonezh/</loc>
+        <lastmod>2026-03-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="None"/>
+    </url>
+    <url>
+        <loc>Nonezh/api_reference/</loc>
+        <lastmod>2026-03-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/api_reference/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Noneapi_reference/"/>
+    </url>
+    <url>
+        <loc>Nonezh/quickstart/</loc>
+        <lastmod>2026-03-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/quickstart/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonequickstart/"/>
+    </url>
+    <url>
+        <loc>Nonezh/modules/client/</loc>
+        <lastmod>2026-03-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/modules/client/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonemodules/client/"/>
+    </url>
+    <url>
+        <loc>Nonezh/modules/core/</loc>
+        <lastmod>2026-03-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/modules/core/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonemodules/core/"/>
+    </url>
+    <url>
+        <loc>Nonezh/modules/embedding/</loc>
+        <lastmod>2026-03-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/modules/embedding/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonemodules/embedding/"/>
+    </url>
+    <url>
+        <loc>Nonezh/modules/pipeline/</loc>
+        <lastmod>2026-03-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/modules/pipeline/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonemodules/pipeline/"/>
+    </url>
+    <url>
+        <loc>Nonezh/modules/provider/</loc>
+        <lastmod>2026-03-28</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="Nonezh/modules/provider/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="Nonemodules/provider/"/>
+    </url>
+</urlset>

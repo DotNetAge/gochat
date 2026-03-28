@@ -11,6 +11,7 @@ GoChat is a **modern, enterprise-ready Go client SDK for Large Language Models (
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Report Card](https://goreportcard.com/badge/github.com/DotNetAge/gochat)](https://goreportcard.com/report/github.com/DotNetAge/gochat)
 [![codecov](https://codecov.io/gh/DotNetAge/gochat/graph/badge.svg?token=placeholder)](https://codecov.io/gh/DotNetAge/gochat)
+[![Docs](https://img.shields.io/badge/docs-gochat.rayainfo.cn-e92063.svg)](https://gochat.rayainfo.cn)
 
 <p>
 
@@ -21,19 +22,20 @@ GoChat is a **modern, enterprise-ready Go client SDK for Large Language Models (
 
 ---
 
-## ✨ New & Killer Features
+## ✨ Core Killer Features (Why GoChat?)
 
-- **🔌 Seamless Model Switching**: Change one line of initialization code to switch your application effortlessly between GPT-4o, Claude 3.7, DeepSeek-R1, and Qwen-Max.
-- **🧠 Native Deep Thinking Support**: Built-in interceptors compatible with the reasoning chains of DeepSeek-R1, Claude 3.7, and OpenAI o1/o3.
-- **🧬 Unified Embedding System**: 
-    - Support for both **Remote APIs** (OpenAI/Azure) and **Local Models** (ONNX/BGE/Sentence-BERT).
-    - High-performance **Batch Processing** with concurrent execution and atomic progress tracking.
-    - Built-in **LRU Caching** to avoid redundant vector calculations.
-- **⛓️ Modular Pipeline Framework**: 
-    - Orchestrate complex LLM workflows (RAG, multi-step reasoning) using a clean **Step-based** architecture.
-    - Thread-safe **State Management** and execution **Hooks** for full observability.
-- **🌐 Web Search at Will**: Native support for models with external web retrieval (like Qwen) via `core.WithEnableSearch(true)`.
-- **🏢 Enterprise OAuth2 Persistence**: Automates Device Code Flow / OAuth2 authorization with persistent Token storage and auto-refreshing.
+- **🔌 Write Once, Run Anywhere (The Ultimate Client)**
+  - Smooths out the chaotic API differences and streaming SSE formats across OpenAI, Anthropic, DeepSeek, and Qwen.
+  - **Standardized Tool Calling**: Define your tools via `core.Tool` once, and let GoChat translate them into Anthropic's unique format or OpenAI's standard format automatically under the hood.
+  - **Smart Resilience**: Built-in exponential backoff and jitter quietly handles HTTP 429 Rate Limits and network hiccups, preventing your app from crashing in production.
+- **🧠 Zero-Dependency Local Embeddings**
+  - **Break free from Ollama & Python**: Execute ONNX text embeddings locally right within your pure Go binary. No heavy external inference servers needed!
+  - **Built-in Auto-Downloader**: Simply call `embedding.WithBEG("bge-small-zh-v1.5", "")`. GoChat will automatically fetch the model from HuggingFace, cache it, and load it into memory.
+  - **Industrial Batching**: Features concurrent batching and a zero-cost text hashing cache designed to process massive datasets efficiently.
+- **🌊 Elegant Type-Safe Pipeline (Generics)**
+  - Build complex Agent and RAG workflows elegantly by chaining independent, reusable `Step`s.
+  - **Type-Safe Context**: Powered by Go 1.24+ generics, safely pass your own custom `struct` between steps. Say goodbye to fragile `map[string]any` type-assertion panics.
+  - **Declarative Control Flow**: Utilize `NewIf`, `NewLoop`, and AOP lifecycle `Hooks` for observable and clean orchestration without nested `if err != nil` hell.
 
 ---
 
@@ -117,3 +119,16 @@ GoChat adheres to Go's philosophy of minimalism: The core interface `core.Client
 ## 📄 License
 
 This project is open-sourced under the [MIT License](LICENSE). PRs are welcome!
+
+---
+
+## 📚 Comprehensive Documentation
+
+Check out the `docs/` folder for detailed guides, architecture diagrams, and API references:
+- 📖 [Project Overview](docs/overview.md)
+- 🚀 [Quick Start](docs/quickstart.md)
+- 🧠 [Client Module (LLM & Tool Calling)](docs/modules/client.md)
+- 🧬 [Embedding Module (Local Vectorization)](docs/modules/embedding.md)
+- ⛓️ [Pipeline Module (Workflow Orchestration)](docs/modules/pipeline.md)
+- 🏢 [Provider Module (OAuth2 & Providers)](docs/modules/provider.md)
+- 📋 [API Reference](docs/api_reference.md)

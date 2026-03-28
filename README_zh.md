@@ -10,6 +10,7 @@ GoChat 是一个专为生产环境打造的**现代化 Go 语言大模型 (LLM) 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Report Card](https://goreportcard.com/badge/github.com/DotNetAge/gochat)](https://goreportcard.com/report/github.com/DotNetAge/gochat)
 [![codecov](https://codecov.io/gh/DotNetAge/gochat/graph/badge.svg?token=placeholder)](https://codecov.io/gh/DotNetAge/gochat)
+[![Docs](https://img.shields.io/badge/docs-gochat.rayainfo.cn-e92063.svg)](https://gochat.rayainfo.cn)
 
 
 <p>
@@ -23,19 +24,20 @@ GoChat 是一个专为生产环境打造的**现代化 Go 语言大模型 (LLM) 
 
 ---
 
-## ✨ 新特性与核心优势
+## ✨ 核心杀手锏 (为什么选择 GoChat？)
 
-- **🔌 一键无缝切模型**：只需改一行代码，即可在 GPT-4o、Claude 3.7、DeepSeek-R1、Qwen-Max 之间自由切换。
-- **🧠 原生支持深度思考 (Reasoning)**：内置拦截器，完美兼容 DeepSeek-R1、Claude 3.7、OpenAI o1/o3 的思维链。
-- **🧬 统一向量化 (Embedding) 系统**：
-    - 支持 **远程 API** (OpenAI/Azure) 与 **本地模型** (ONNX/BGE/Sentence-BERT)。
-    - 高性能 **批量处理 (Batch Processing)**，支持并发执行与原子化进度追踪。
-    - 内置 **LRU 缓存** 机制，避免重复的向量计算，节省成本。
-- **⛓️ 模块化流水线 (Pipeline) 框架**：
-    - 使用清晰的 **Step 架构** 编排复杂的 LLM 工作流（如 RAG、多步推理）。
-    - 线程安全的 **状态管理** 与执行 **Hooks**，实现全方位的可观测性。
-- **🌐 随心开启联网搜索**：原生支持 Qwen 等具备外网检索能力的模型，一行代码即可开启。
-- **🏢 企业级 OAuth2 持久化鉴权**：全自动处理 Device Code Flow / OAuth2 授权、Token 持久化存储与自动刷新。
+- **🔌 终极的“一次编写，到处运行” (Client 模块)**
+  - 彻底抹平 OpenAI、Anthropic (Claude)、DeepSeek、Qwen 等模型间繁杂的 API 结构与流式解析差异。
+  - **大一统的 Tool Calling**：只需定义一次 `core.Tool`，框架底层会自动将其“翻译”为对应厂商（如 Anthropic 独有的）工具调用格式，无缝切换底层模型。
+  - **内置防脆弱机制**：底层自动捕获 HTTP 429 限流与网络波动，触发带抖动的指数退避（Exponential Backoff）重试，让您的服务稳如泰山。
+- **🧠 脱离 Ollama 的“零配置”本地向量化 (Embedding)**
+  - **摆脱臃肿依赖**：直接基于轻量级 ONNX 运行时在本地计算 Embedding。无需额外部署庞大的 Ollama 服务，也无需折腾复杂的 Python 环境。
+  - **内置极客下载器**：只需一行 `embedding.WithBEG("bge-small-zh-v1.5", "")`，本地缺失时自动从远端镜像分片拉取模型并加载就绪。
+  - **工业级批处理**：内置 `BatchProcessor`，支持动态并发切批，自动对相同文本进行 Hash 缓存过滤，极限榨取 CPU 算力。
+- **🌊 将极度复杂的逻辑变优雅 (泛型 Pipeline)**
+  - 像搭积木一样串联独立的 `Step`，优雅编排复杂的 RAG 或 Agent 思考流。
+  - **强类型上下文流转**：得益于 Go 1.24+ 泛型，您可在 Step 间无缝传递自定义的强类型 `struct`。彻底告别传统 `map[string]any` 带来的类型断言崩溃与拼写错误。
+  - **可编程控制流**：内置 `IfStep`、`LoopStep` 与 AOP 监控钩子 (`Hooks`)，赋予工作流超强的可观测性与调度域控制力。
 
 ---
 
@@ -119,3 +121,16 @@ GoChat 秉承 Go 的极简大道：核心接口 `core.Client` 只有 `Chat` 和 
 ## 📄 许可证
 
 本项目基于 [MIT License](LICENSE) 开源。欢迎提交 PR 一起共建！
+
+---
+
+## 📚 详细文档 (Documentation)
+
+请查阅 `docs/` 目录获取详细的指南、架构图与 API 参考：
+- 📖 [项目概述](docs/overview.md)
+- 🚀 [快速入门](docs/quickstart.md)
+- 🧠 [Client 模块 (大模型与工具调用)](docs/modules/client.md)
+- 🧬 [Embedding 模块 (本地向量化)](docs/modules/embedding.md)
+- ⛓️ [Pipeline 模块 (工作流编排)](docs/modules/pipeline.md)
+- 🏢 [Provider 模块 (OAuth2 鉴权)](docs/modules/provider.md)
+- 📋 [API 参考](docs/api_reference.md)
