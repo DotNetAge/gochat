@@ -2,7 +2,7 @@
 <h1>🚀 GoChat</h1>
 
 <p><b>
-GoChat is a **modern, enterprise-ready Go client SDK for Large Language Models (LLMs)**. It provides an exceptionally elegant and type-safe unified interface that completely smooths out the chaotic API differences between OpenAI, Anthropic (Claude), DeepSeek, Qwen, Ollama, and other major cloud providers or local models.
+GoChat is a <b>modern, enterprise-ready Go client SDK for Large Language Models (LLMs)</b>. It provides an exceptionally elegant and type-safe unified interface that completely smooths out the chaotic API differences between OpenAI, Anthropic (Claude), DeepSeek, Qwen, Ollama, and other major cloud providers or local models.
 </b></p>
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/DotNetAge/gochat.svg)](https://pkg.go.dev/github.com/DotNetAge/gochat)
@@ -12,9 +12,10 @@ GoChat is a **modern, enterprise-ready Go client SDK for Large Language Models (
 [![codecov](https://codecov.io/gh/DotNetAge/gochat/graph/badge.svg?token=placeholder)](https://codecov.io/gh/DotNetAge/gochat)
 [![Docs](https://img.shields.io/badge/docs-gochat.rayainfo.cn-e92063.svg)](https://gochat.rayainfo.cn)
 
+
 <p>
 
-[**English**](README.md) | [简体中文](README_zh.md)
+[<b>English</b>](README.md) | [简体中文](README_zh.md)
 
 </p>
 </div>
@@ -23,20 +24,13 @@ GoChat is a **modern, enterprise-ready Go client SDK for Large Language Models (
 
 ---
 
-## ✨ Core Killer Features (Why GoChat?)
+## ✨ Core Features (Why GoChat?)
 
-- **🔌 The Ultimate "Write Once, Run Anywhere" (Client Module)**
-  - Completely smooths out the chaotic API structures and streaming parsing differences between OpenAI, Anthropic (Claude), DeepSeek, Qwen, and other models.
-  - **Unified Tool Calling**: Define `core.Tool` once, and the framework will automatically "translate" it into the corresponding vendor's tool calling format (such as Anthropic's unique format), enabling seamless switching between underlying models.
-  - **Built-in Anti-Fragility Mechanism**: Automatically captures HTTP 429 rate limits and network fluctuations, triggering exponential backoff with jitter retry, keeping your service rock-solid.
-- **🧠 "Zero-Configuration" Local Vectorization (Embedding) Without Ollama**
-  - **Get Rid of Bulky Dependencies**: Directly compute Embedding locally based on lightweight ONNX runtime. No need to deploy massive Ollama services or deal with complex Python environments.
-  - **Built-in Geek Downloader**: Just one line `embedding.WithBEG("bge-small-zh-v1.5", "")`, automatically pulls model shards from remote mirrors when missing locally and loads them ready.
-  - **Industrial-Grade Batching**: Built-in `BatchProcessor` supports dynamic concurrent batching and automatic Hash cache filtering for identical texts, maximizing CPU computing power.
-- **🌊 Making Extremely Complex Logic Elegant (Generic Pipeline)**
-  - Chain independent `Step`s like building blocks to elegantly orchestrate complex RAG or Agent reasoning flows.
-  - **Strongly-Typed Context Transfer**: Thanks to Go 1.24+ generics, you can seamlessly pass custom strongly-typed `struct`s between Steps. Completely say goodbye to type assertion crashes and typos caused by traditional `map[string]any`.
-  - **Programmable Control Flow**: Built-in `IfStep`, `LoopStep`, and AOP monitoring hooks (`Hooks`) give workflows exceptional observability and scheduling domain control.
+- **🔌 Unified Interface**: Provides a consistent API interface that shields differences between different LLM providers
+- **Unified Tool Calling**: Define tools once, automatically convert to the corresponding provider's tool calling format
+- **Built-in Anti-Fragility Mechanism**: Automatically captures HTTP 429 rate limits and network fluctuations, triggering exponential backoff with jitter retry
+- **Workflow Orchestration**: Elegantly organize complex RAG or Agent reasoning flows through Pipeline
+- **Strongly-Typed Context Transfer**: Leverage Go 1.24+ generics to seamlessly pass custom strongly-typed structs between steps
 
 ---
 
@@ -50,51 +44,89 @@ go get github.com/DotNetAge/gochat
 
 ## 🚀 Quick Start
 
-### 1. High-Performance Vectorization (Embedding)
+### 1. Create Client
 
 ```go
-// Use BatchProcessor to optimize vector generation
-processor := embedding.NewBatchProcessor(provider, embedding.BatchOptions{
-    MaxBatchSize:  32,
-    MaxConcurrent: 4,
-})
+import (
+    "github.com/DotNetAge/gochat/core"
+    "github.com/DotNetAge/gochat/client/openai"
+)
 
-// Generate vectors and track progress
-embeddings, err := processor.ProcessWithProgress(ctx, texts, func(current, total int, err error) bool {
-    fmt.Printf("Progress: %d/%d\n", current, total)
-    return true // Return false to cancel task
+// Create OpenAI client
+client, err := openai.NewOpenAI(core.Config{
+    APIKey: "your-api-key",
+    Model:  "gpt-4o",
 })
+if err != nil {
+    log.Fatal(err)
+}
 ```
 
-### 2. Pipeline Workflow
+### 2. Send Message
 
 ```go
+import "github.com/DotNetAge/gochat/core"
+
+// Create messages
+messages := []core.Message{
+    core.NewSystemMessage("You are a helpful assistant."),
+    core.NewUserMessage("Hello, who are you?"),
+}
+
+// Send message
+response, err := client.Chat(ctx, messages)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println(response.Content)
+```
+
+### 3. Streaming Response
+
+```go
+// Send streaming request
+stream, err := client.ChatStream(ctx, messages)
+if err != nil {
+    log.Fatal(err)
+}
+defer stream.Close()
+
+// Process streaming response
+for stream.Next() {
+    event := stream.Event()
+    fmt.Print(event.Content)
+}
+
+if err := stream.Err(); err != nil {
+    log.Fatal(err)
+}
+```
+
+### 4. Use Pipeline
+
+```go
+import (
+    "github.com/DotNetAge/gochat/pipeline"
+    "github.com/DotNetAge/gochat/pipeline/steps"
+)
+
+// Create Pipeline
 p := pipeline.New[*pipeline.State]().
     AddStep(steps.NewTemplateStep("User question: {{.query}}", "prompt", "query")).
-    AddStep(steps.NewGenerateCompletionStep(client, "prompt", "answer", "gpt-4o")).
-    AddHook(myLogger) // Observe each step execution
+    AddStep(steps.NewGenerateCompletionStep(client, "prompt", "answer", "gpt-4o"))
 
+// Create state
 state := pipeline.NewState()
 state.Set("query", "What is GoChat?")
 
+// Execute Pipeline
 err := p.Execute(ctx, state)
-fmt.Println(state.GetString("answer"))
-```
-
-### 3. Capturing "Chain of Thought" in Streaming Output
-
-```go
-stream, _ := client.ChatStream(ctx, messages, core.WithThinking(0))
-defer stream.Close()
-
-for stream.Next() {
-    ev := stream.Event()
-    if ev.Type == core.EventThinking {
-        fmt.Print(ev.Content) // Print reasoning process
-    } else if ev.Type == core.EventContent {
-        fmt.Print(ev.Content) // Print final answer
-    }
+if err != nil {
+    log.Fatal(err)
 }
+
+fmt.Println(state.GetString("answer"))
 ```
 
 ---
@@ -108,287 +140,250 @@ for stream.Next() {
 | **DeepSeek**        | V3, R1              | API Key                          |
 | **Alibaba Qwen**    | Tongyi Qianwen series | API Key, OAuth2, Device Code   |
 | **Google Gemini**   | 1.5 Pro/Flash       | API Key, OAuth2                  |
-| **Local / ONNX**    | BGE, Sentence-BERT  | Local Execution (No Key Required)|
+| **Ollama**          | Locally deployed models | Local Execution (No Key Required)|  
 | **Azure OpenAI**    | Microsoft-deployed models | API Key (Azure format)      |
 
 ---
 
-### 4. Local Embedding Model Usage
+## 🏗️ Project Architecture
 
-GoChat's embedding package provides complete local embedding model support, achieving efficient text embedding generation through ONNX format models. The local solution requires no API Key, has no network dependency, and can run completely offline, making it ideal for scenarios with strict requirements for data privacy and response latency.
+GoChat adopts a modular architecture design, separating different functions into independent packages to achieve high scalability and maintainability.
 
-#### 4.1 Complete List of Implemented Providers
+### Overall Architecture
 
-| Provider Type         | Model Type            | Dimension | Use Case             | Features                           |
-| :-------------------- | :-------------------- | :-------- | :------------------- | :--------------------------------- |
-| **BGEProvider**       | bge-small-zh-v1.5    | 512       | Chinese Semantic Sim | Efficient Chinese embedding, lightweight |
-| **BGEProvider**       | bge-base-zh-v1.5     | 768       | Chinese Semantic Sim | Higher accuracy, balanced performance |
-| **SentenceBERTProvider** | all-MiniLM-L6-v2 | 384       | English Semantic Search | Ultra-fast inference, real-time apps |
-| **SentenceBERTProvider** | all-mpnet-base-v2 | 768       | English Semantic Search | High precision, BERT architecture |
-| **CLIPProvider**     | clip-vit-base-patch32 | 512       | Multimodal Image-Text | Text & image bidirectional embedding |
-| **LocalProvider**     | bert-base-uncased    | 768       | General English Tasks | Standard BERT model               |
+```
+gochat/
+├── client/         # LLM provider client implementations
+│   ├── anthropic/  # Anthropic (Claude) client
+│   ├── azureopenai/ # Azure OpenAI client
+│   ├── deepseek/   # DeepSeek client
+│   ├── ollama/     # Ollama local model client
+│   └── openai/     # OpenAI client
+├── core/           # Core interfaces and common functionality
+├── pipeline/       # Workflow orchestration functionality
+├── provider/       # Additional provider implementations
+├── docs/           # Documentation
+└── examples/       # Example code
+```
+
+### Core Modules
+
+- **Core Module**: Defines core interfaces and common functionality, serving as the foundation of the library
+- **Client Module**: Contains specific implementations for various LLM providers
+- **Pipeline Module**: Provides workflow orchestration functionality, allowing users to combine independent steps into complex processes
+- **Provider Module**: Contains additional provider implementations such as Gemini, Minimax, and Qwen
+
+## 4. Key Classes and Functions
+
+### 4.1 Core Module
+
+#### Client Interface
 
 ```go
-import "gochat/pkg/embedding"
-
-// Provider interface definition
-type Provider interface {
-    Embed(ctx context.Context, texts []string) ([][]float32, error)
-    Dimension() int
-}
-
-// Multimodal Provider (with image support)
-type MultimodalProvider interface {
-    Provider
-    EmbedImages(ctx context.Context, images [][]byte) ([][]float32, error)
+type Client interface {
+    Chat(ctx context.Context, messages []Message, opts ...Option) (*Response, error)
+    ChatStream(ctx context.Context, messages []Message, opts ...Option) (*Stream, error)
 }
 ```
 
-#### 4.2 Downloading ONNX Models with Downloader
+- **Parameters**:
+  - `ctx`: Context for cancellation and timeout
+  - `messages`: Conversation messages
+  - `opts`: Optional parameters (temperature, max tokens, tools, etc.)
 
-Downloader provides functionality for downloading pre-compiled ONNX models from HuggingFace, supporting progress tracking and cache management.
+- **Return Values**:
+  - `Chat`: Returns complete response and error
+  - `ChatStream`: Returns event stream and error
+
+#### Message-related Functions
+
+- **NewUserMessage(text string) Message**: Creates a user message
+- **NewSystemMessage(text string) Message**: Creates a system message
+- **NewTextMessage(role, text string) Message**: Creates a text message
+
+#### Option-related Functions
+
+- **WithTemperature(t float64) Option**: Sets temperature
+- **WithMaxTokens(t int) Option**: Sets maximum tokens
+- **WithTools(tools []Tool) Option**: Sets tools
+- **WithThinking(level int) Option**: Enables thinking mode
+
+### 4.2 Client Module
+
+#### OpenAI Client
 
 ```go
-// Create downloader (specify cache directory)
-downloader := embedding.NewDownloader("~/.gochat/models")
+func NewOpenAI(config core.Config) (*Client, error)
+```
 
-// View available model list
-models := downloader.GetModelInfo()
-for _, m := range models {
-    fmt.Printf("Model: %s | Type: %s | Size: %s\n", m.Name, m.Type, m.Size)
+- **Parameters**:
+  - `config`: Contains API key, model name, base URL, etc.
+
+- **Return Values**:
+  - OpenAI client instance and error
+
+#### Anthropic Client
+
+```go
+func NewAnthropic(config core.Config) (*Client, error)
+```
+
+- **Parameters**:
+  - `config`: Contains API key, model name, etc.
+
+- **Return Values**:
+  - Anthropic client instance and error
+
+### 4.3 Pipeline Module
+
+#### Pipeline-related Functions
+
+```go
+func New[T any]() *Pipeline[T]
+func (p *Pipeline[T]) AddStep(step Step[T]) *Pipeline[T]
+func (p *Pipeline[T]) Execute(ctx context.Context, state T) error
+```
+
+- **Parameters**:
+  - `step`: Step to add
+  - `ctx`: Context for cancellation
+  - `state`: State object passed to each step
+
+- **Return Values**:
+  - `New`: Returns new Pipeline instance
+  - `AddStep`: Returns Pipeline instance for method chaining
+  - `Execute`: Returns execution error
+
+#### Step-related Functions
+
+```go
+func NewTemplateStep(template, outputKey, inputKeys ...string) Step[*State]
+func NewGenerateCompletionStep(client core.Client, inputKey, outputKey, model string) Step[*State]
+```
+
+- **Parameters**:
+  - `template`: Template string
+  - `outputKey`: Output key
+  - `inputKeys`: Input keys
+  - `client`: LLM client
+  - `model`: Model name
+
+- **Return Values**:
+  - Step instance
+
+## 5. Dependencies
+
+GoChat's main dependencies are as follows:
+
+| Dependency | Purpose | Source |
+|------------|---------|--------|
+| Go 1.24+ | Basic language environment, supports generics | [golang.org](https://golang.org/) |
+| net/http | HTTP client | Standard library |
+| encoding/json | JSON serialization and deserialization | Standard library |
+| context | Context management | Standard library |
+
+## 🔧 Configuration and Deployment
+
+### Configuration Options
+
+GoChat's configuration is primarily managed through the `core.Config` struct:
+
+```go
+type Config struct {
+    APIKey     string            // API key
+    AuthToken  string            // Authentication token
+    Model      string            // Model name
+    BaseURL    string            // API base URL
+    HTTPClient *http.Client      // Custom HTTP client
+    Headers    map[string]string // Custom HTTP headers
+}
+```
+
+### Environment Variables
+
+GoChat supports reading configuration from environment variables:
+
+- `GOCHAT_API_KEY`: API key
+- `GOCHAT_MODEL`: Default model name
+- `GOCHAT_BASE_URL`: API base URL
+
+### Deployment Recommendations
+
+- **Production Environment**: It is recommended to use environment variables to store API keys to avoid hardcoding
+- **High Concurrency Scenarios**: It is recommended to use a custom HTTP client with reasonable timeout and connection pool configurations
+- **Fault Tolerance**: It is recommended to implement retry mechanisms and error handling to improve system stability
+
+## 📊 Monitoring and Maintenance
+
+### Logging
+
+GoChat supports logging through the Pipeline's Hook mechanism:
+
+```go
+// Implement Hook interface
+type LoggerHook struct{}
+
+func (h *LoggerHook) OnStepStart(ctx context.Context, step pipeline.Step[*pipeline.State], state *pipeline.State) {
+    fmt.Printf("Step %s started\n", step.Name())
 }
 
-// Download progress callback function
-callback := func(modelName, fileName string, downloaded, total int64) {
-    if total > 0 {
-        percent := float64(downloaded) / float64(total) * 100
-        fmt.Printf("\r[%s] %s: %.1f%%", modelName, fileName, percent)
+func (h *LoggerHook) OnStepComplete(ctx context.Context, step pipeline.Step[*pipeline.State], state *pipeline.State) {
+    fmt.Printf("Step %s completed\n", step.Name())
+}
+
+func (h *LoggerHook) OnStepError(ctx context.Context, step pipeline.Step[*pipeline.State], state *pipeline.State, err error) {
+    fmt.Printf("Step %s error: %v\n", step.Name(), err)
+}
+
+// Add Hook
+p := pipeline.New[*pipeline.State]().
+    AddStep(step1).
+    AddHook(&LoggerHook{})
+```
+
+### Error Handling
+
+GoChat provides detailed error types:
+
+- `ValidationError`: Parameter validation error
+- `NetworkError`: Network error
+- `APIError`: Error returned by the API
+- `RateLimitError`: Rate limit error
+
+It is recommended to implement appropriate error handling when using GoChat:
+
+```go
+response, err := client.Chat(ctx, messages)
+if err != nil {
+    switch e := err.(type) {
+    case *core.RateLimitError:
+        // Handle rate limit
+        time.Sleep(e.RetryAfter)
+    case *core.NetworkError:
+        // Handle network error
+        retryCount++
+    default:
+        // Handle other errors
+        log.Fatal(err)
     }
 }
-
-// Download model
-modelPath, err := downloader.DownloadModel("bge-small-zh-v1.5", callback)
-if err != nil {
-    log.Fatal(err)
-}
-fmt.Printf("\nModel downloaded to: %s\n", modelPath)
 ```
 
-**Downloader Core Methods:**
+## 📁 Example Code
 
-| Method                      | Parameters                            | Return Value         | Description                     |
-| :-------------------------- | :------------------------------------ | :------------------- | :------------------------------ |
-| `NewDownloader(cacheDir)`   | Cache directory path, empty for default | `*Downloader`        | Create downloader instance      |
-| `GetModelInfo()`            | None                                  | `[]DownloadModelInfo` | Return all available model info |
-| `DownloadModel(name, callback)` | Model name, progress callback       | `(string, error)`    | Download specified model        |
+GoChat provides rich example code in the `examples/` directory:
 
-**Supported Model File Download List:**
-
-| Model Name             | File URL                                       | Est. Size     |
-| :-------------------- | :--------------------------------------------- | :------------ |
-| bge-small-zh-v1.5     | model_fp16.onnx, model_fp16.onnx_data         | ~48MB         |
-| all-MiniLM-L6-v2      | model_fp16.onnx                                | ~45.3MB       |
-| bert-base-uncased     | model_fp16.onnx                                | ~200MB        |
-| bge-base-zh-v1.5      | model_fp16.onnx                                | ~100MB        |
-| clip-vit-base-patch32 | text_model_fp16.onnx, vision_model_fp16.onnx  | ~300MB        |
-| all-mpnet-base-v2     | model_fp16.onnx                                | ~218MB        |
-
-#### 4.3 Local Embedding Model Initialization Configuration
-
-**Method 1: Auto-Download and Initialize (Recommended)**
-
-```go
-// Use BGE model, auto-download (if not cached)
-provider, err := embedding.WithBEG("bge-small-zh-v1.5", "")
-if err != nil {
-    log.Fatal(err)
-}
-
-// Use BERT model
-bertProvider, err := embedding.WithBERT("all-mpnet-base-v2", "")
-if err != nil {
-    log.Fatal(err)
-}
-
-// Use CLIP multimodal model
-clipProvider, err := embedding.WithCLIP("clip-vit-base-patch32", "")
-if err != nil {
-    log.Fatal(err)
-}
-```
-
-**Method 2: Specify Local Path Initialization**
-
-```go
-// Already downloaded model, specify path directly
-provider, err := embedding.WithBEG("bge-small-zh-v1.5", "/path/to/model")
-if err != nil {
-    log.Fatal(err)
-}
-
-// Use factory function to create
-provider, err := embedding.NewProvider("/path/to/bge-small-zh-v1.5")
-if err != nil {
-    log.Fatal(err)
-}
-
-// Custom config to create LocalProvider
-localProvider, err := embedding.New(embedding.Config{
-    Model:        model,
-    Dimension:    512,
-    MaxBatchSize: 32,
-})
-```
-
-**Method 3: Create Specific Provider Directly**
-
-```go
-// Create BGE Provider
-bgeProvider, err := embedding.NewBGEProvider("/path/to/bge-model")
-
-// Create Sentence-BERT Provider
-sbProvider, err := embedding.NewSentenceBERTProvider("/path/to/sbert-model")
-
-// Create CLIP Provider (with image-text support)
-clipProvider, err := embedding.NewCLIPProvider("/path/to/clip-model")
-```
-
-#### 4.4 Usage Methods
-
-**Basic Text Embedding Generation**
-
-```go
-ctx := context.Background()
-
-// Single call
-texts := []string{"Hello world", "你好世界"}
-embeddings, err := provider.Embed(ctx, texts)
-if err != nil {
-    log.Fatal(err)
-}
-
-// Batch call (automatic batching)
-largeTextList := make([]string, 1000)
-// ... fill texts
-embeddings, err := provider.Embed(ctx, largeTextList)
-
-// Get vector dimension
-dim := provider.Dimension()
-fmt.Printf("Vector dimension: %d\n", dim)
-fmt.Printf("Number of vectors generated: %d\n", len(embeddings))
-```
-
-**CLIP Multimodal Usage (Image-Text Embedding)**
-
-```go
-clipProvider, err := embedding.WithCLIP("clip-vit-base-patch32", "")
-
-// Text embedding
-textEmbeddings, err := clipProvider.Embed(ctx, []string{"a cat", "a dog"})
-
-// Image embedding
-imageData, err := os.ReadFile("image.jpg")
-imageEmbeddings, err := clipProvider.EmbedImages(ctx, [][]byte{imageData})
-
-// Calculate image-text similarity
-similarity := cosineSimilarity(textEmbeddings[0], imageEmbeddings[0])
-```
-
-**Optimize Batch Processing with BatchProcessor**
-
-```go
-// Create batch processor
-processor := embedding.NewBatchProcessor(provider, embedding.BatchOptions{
-    MaxBatchSize:  32,                      // Max texts per batch
-    MaxConcurrent: 4,                       // Max concurrent batches
-    CacheSize:     1000,                    // LRU cache entries
-})
-
-// Simple batch processing
-embeddings, err := processor.Process(ctx, texts)
-
-// Batch processing with progress (suitable for large texts)
-callback := func(completed, total int) {
-    fmt.Printf("Progress: %d/%d (%.1f%%)\n", completed, total, float64(completed)/float64(total)*100)
-}
-embeddings, err := processor.ProcessWithProgress(ctx, largeTextList, callback)
-```
-
-#### 4.5 Performance Optimization Suggestions
-
-**1. Batch Processing Optimization**
-
-```go
-// Adjust batch size based on model and hardware
-// GPU: MaxBatchSize = 64-128
-// CPU: MaxBatchSize = 16-32
-processor := embedding.NewBatchProcessor(provider, embedding.BatchOptions{
-    MaxBatchSize:  32,
-    MaxConcurrent: runtime.NumCPU(),  // Utilize multi-core
-    CacheSize:     5000,              // Increase cache to reduce redundant computation
-})
-```
-
-**2. Cache Optimization**
-
-```go
-// Duplicate texts are automatically cached
-// First call computes and caches, subsequent calls return directly
-texts := []string{"hot query", "hot query", "hot query"} // Only computed once
-embeddings, _ := processor.Process(ctx, texts)
-```
-
-**3. Concurrent Processing**
-
-```go
-// For large volumes of text, process different batches in parallel
-func parallelEmbed(ctx context.Context, provider embedding.Provider, texts []string, workers int) ([][]float32, error) {
-    chunkSize := (len(texts) + workers - 1) / workers
-    var wg sync.WaitGroup
-    results := make([][][]float32, workers)
-    errors := make([]error, workers)
-
-    for i := 0; i < workers; i++ {
-        wg.Add(1)
-        go func(idx int) {
-            defer wg.Done()
-            start := idx * chunkSize
-            end := start + chunkSize
-            if end > len(texts) {
-                end = len(texts)
-            }
-            results[idx], errors[idx] = provider.Embed(ctx, texts[start:end])
-        }(i)
-    }
-    wg.Wait()
-
-    // Merge results
-    var allEmbeddings [][]float32
-    for _, emb := range results {
-        allEmbeddings = append(allEmbeddings, emb...)
-    }
-    return allEmbeddings, nil
-}
-```
-
-**4. Resource Cleanup**
-
-```go
-// Close Provider to release resources after use
-defer func() {
-    if provider != nil {
-        provider.Close()
-    }
-}()
-```
-
-**Performance Benchmark Reference:**
-
-| Model                  | Hardware   | Batch Size | Avg Latency | Throughput        |
-| :-------------------- | :--------- | :--------- | :---------- | :---------------- |
-| bge-small-zh-v1.5     | CPU (4 core) | 32         | ~50ms/batch | ~600 texts/sec  |
-| all-MiniLM-L6-v2      | CPU (4 core) | 32         | ~30ms/batch | ~1000 texts/sec |
-| clip-vit-base-patch32 | CPU (4 core) | 16         | ~80ms/batch | ~200 images/sec |
+| Example | Functionality | Path |
+|---------|---------------|------|
+| 01_basic_chat | Basic chat functionality | [examples/01_basic_chat/main.go](file:///Users/ray/workspaces/ai-ecosystem/gochat/examples/01_basic_chat/main.go) |
+| 02_multi_turn | Multi-turn conversation | [examples/02_multi_turn/main.go](file:///Users/ray/workspaces/ai-ecosystem/gochat/examples/02_multi_turn/main.go) |
+| 03_streaming | Streaming response | [examples/03_streaming/main.go](file:///Users/ray/workspaces/ai-ecosystem/gochat/examples/03_streaming/main.go) |
+| 04_tool_calling | Tool calling | [examples/04_tool_calling/main.go](file:///Users/ray/workspaces/ai-ecosystem/gochat/examples/04_tool_calling/main.go) |
+| 05_multiple_providers | Multiple providers | [examples/05_multiple_providers/main.go](file:///Users/ray/workspaces/ai-ecosystem/gochat/examples/05_multiple_providers/main.go) |
+| 06_image_input | Image input | [examples/06_image_input/main.go](file:///Users/ray/workspaces/ai-ecosystem/gochat/examples/06_image_input/main.go) |
+| 07_document_analysis | Document analysis | [examples/07_document_analysis/main.go](file:///Users/ray/workspaces/ai-ecosystem/gochat/examples/07_document_analysis/main.go) |
+| 08_multiple_images | Multiple image input | [examples/08_multiple_images/main.go](file:///Users/ray/workspaces/ai-ecosystem/gochat/examples/08_multiple_images/main.go) |
+| 09_helper_utilities | Helper utilities | [examples/09_helper_utilities/main.go](file:///Users/ray/workspaces/ai-ecosystem/gochat/examples/09_helper_utilities/main.go) |
 
 ## 🎯 Design Philosophy
 
@@ -405,8 +400,19 @@ This project is open-sourced under the [MIT License](LICENSE). PRs are welcome!
 Please refer to the `docs/` directory for detailed guides, architecture diagrams, and API references:
 - 📖 [Project Overview](https://gochat.rayainfo.cn/)
 - 🚀 [Quick Start](https://gochat.rayainfo.cn/quickstart/)
-- 🧠 [Client Module (LLM & Tool Calling)](https://gochat.rayainfo.cn/modules/embedding/)
-- 🧬 [Embedding Module (Local Vectorization)](https://gochat.rayainfo.cn/modules/embedding/)
+- 🧠 [Client Module (LLM & Tool Calling)](https://gochat.rayainfo.cn/modules/client/)
 - ⛓️ [Pipeline Module (Workflow Orchestration)](https://gochat.rayainfo.cn/modules/pipeline/)
 - 🏢 [Provider Module (OAuth2 Authentication)](https://gochat.rayainfo.cn/modules/provider/)
 - 📋 [API Reference](https://gochat.rayainfo.cn/api_reference/)
+
+## 📝 Summary and Highlights
+
+GoChat is a powerful, elegantly designed Go language LLM client SDK with the following core advantages:
+
+- **Unified Interface**: Shield API differences between different LLM providers, achieving "write once, run anywhere"
+- **Type Safety**: Leverage Go's type system and generics to provide a type-safe API
+- **Powerful Workflow Orchestration**: Elegantly organize complex logic through Pipeline
+- **Built-in Anti-Fragility Mechanism**: Automatically handle network fluctuations and rate limits
+- **Rich Examples**: Provide comprehensive example code to help users get started quickly
+
+With GoChat, developers can focus more on business logic rather than dealing with API differences between different LLM providers, thereby building LLM-based applications more efficiently.

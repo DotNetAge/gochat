@@ -17,9 +17,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/DotNetAge/gochat/pkg/client/base"
-	"github.com/DotNetAge/gochat/pkg/client/openai"
-	"github.com/DotNetAge/gochat/pkg/core"
+	"github.com/DotNetAge/gochat/client/openai"
+	"github.com/DotNetAge/gochat/core"
 )
 
 func main() {
@@ -29,11 +28,9 @@ func main() {
 	imagePaths := os.Args[1:]
 
 	// Create a client
-	client, err := openai.New(openai.Config{
-		Config: base.Config{
-			APIKey: "OPENAI_API_KEY",
-			Model:  "gpt-4-vision-preview",
-		},
+	client, err := openai.NewOpenAI(core.Config{
+		APIKey: "OPENAI_API_KEY",
+		Model:  "gpt-4-vision-preview",
 	})
 	if err != nil {
 		log.Fatal(err)

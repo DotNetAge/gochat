@@ -6,19 +6,16 @@ import (
 	"log"
 	"testing"
 
-	"github.com/DotNetAge/gochat/pkg/client/base"
-	"github.com/DotNetAge/gochat/pkg/client/ollama"
-	"github.com/DotNetAge/gochat/pkg/core"
+	"github.com/DotNetAge/gochat/client/ollama"
+	"github.com/DotNetAge/gochat/core"
 )
 
 func TestOllama(t *testing.T) {
 	fmt.Println("=== Ollama Integration Test (Model: qwen3:1.7b) ===")
 
-	client, err := ollama.New(ollama.Config{
-		Config: base.Config{
-			Model:   "qwen3:1.7b",
-			BaseURL: "http://localhost:11434",
-		},
+	client, err := ollama.NewOllamaClient(core.Config{
+		Model:   "qwen3:1.7b",
+		BaseURL: "http://localhost:11434",
 	})
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)

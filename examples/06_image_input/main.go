@@ -16,9 +16,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/DotNetAge/gochat/pkg/client/base"
-	"github.com/DotNetAge/gochat/pkg/client/openai"
-	"github.com/DotNetAge/gochat/pkg/core"
+	"github.com/DotNetAge/gochat/client/openai"
+	"github.com/DotNetAge/gochat/core"
 )
 
 func main() {
@@ -53,11 +52,9 @@ func main() {
 	}
 
 	// Create a client with a vision-capable model
-	client, err := openai.New(openai.Config{
-		Config: base.Config{
-			APIKey: "OPENAI_API_KEY",
-			Model:  "gpt-4-vision-preview", // or "gpt-4o"
-		},
+	client, err := openai.NewOpenAI(core.Config{
+		APIKey: "OPENAI_API_KEY",
+		Model:  "gpt-4-vision-preview", // or "gpt-4o"
 	})
 	if err != nil {
 		log.Fatal(err)

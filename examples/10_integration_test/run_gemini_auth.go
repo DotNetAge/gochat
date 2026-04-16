@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/DotNetAge/gochat/pkg/core"
-	"github.com/DotNetAge/gochat/pkg/provider"
+	"github.com/DotNetAge/gochat/core"
+	"github.com/DotNetAge/gochat/provider"
 )
 
 func main() {

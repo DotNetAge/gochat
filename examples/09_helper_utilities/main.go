@@ -10,7 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/DotNetAge/gochat/pkg/core"
+	"github.com/DotNetAge/gochat/core"
 )
 
 // LoadImageAsContentBlock reads an image file and returns a ContentBlock.

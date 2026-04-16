@@ -7,9 +7,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/DotNetAge/gochat/pkg/client/base"
-	"github.com/DotNetAge/gochat/pkg/client/compatible"
-	"github.com/DotNetAge/gochat/pkg/core"
+	"github.com/DotNetAge/gochat/client/openai"
+	"github.com/DotNetAge/gochat/core"
 )
 
 func TestQWen(t *testing.T) {
@@ -20,12 +19,10 @@ func TestQWen(t *testing.T) {
 
 	fmt.Println("=== Aliyun QWen Integration Test (Model: qwen-max) ===")
 
-	client, err := compatible.New(compatible.Config{
-		Config: base.Config{
-			APIKey:  apiKey,
-			Model:   "qwen-max",
-			BaseURL: "https://dashscope.aliyuncs.com/compatible-mode",
-		},
+	client, err := openai.NewOpenAI(core.Config{
+		APIKey:  apiKey,
+		Model:   "qwen-max",
+		BaseURL: "https://dashscope.aliyuncs.com/compatible-mode",
 	})
 	if err != nil {
 		log.Fatalf("Failed to create client: %v", err)

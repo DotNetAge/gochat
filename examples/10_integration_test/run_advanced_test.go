@@ -7,22 +7,19 @@ import (
 	"os"
 	"testing"
 
-	"github.com/DotNetAge/gochat/pkg/client/base"
-	"github.com/DotNetAge/gochat/pkg/client/compatible"
-	"github.com/DotNetAge/gochat/pkg/core"
+	"github.com/DotNetAge/gochat/client/openai"
+	"github.com/DotNetAge/gochat/core"
 )
 
-func getDashScopeClient(t *testing.T, model string) *compatible.Client {
+func getDashScopeClient(t *testing.T, model string) *openai.Client {
 	apiKey := os.Getenv("DASHSCOPE_API_KEY")
 	if apiKey == "" {
 		t.Skip("DASHSCOPE_API_KEY is not set. Skipping test.")
 	}
-	client, err := compatible.New(compatible.Config{
-		Config: base.Config{
-			APIKey:  apiKey,
-			Model:   model,
-			BaseURL: "https://dashscope.aliyuncs.com/compatible-mode",
-		},
+	client, err := openai.NewOpenAI(core.Config{
+		APIKey:  apiKey,
+		Model:   model,
+		BaseURL: "https://dashscope.aliyuncs.com/compatible-mode",
 	})
 	if err != nil {
 		t.Fatalf("Failed to create client: %v", err)

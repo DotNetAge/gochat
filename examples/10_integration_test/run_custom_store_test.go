@@ -5,10 +5,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/DotNetAge/gochat/pkg/client/base"
-	"github.com/DotNetAge/gochat/pkg/client/compatible"
-	"github.com/DotNetAge/gochat/pkg/core"
-	"github.com/DotNetAge/gochat/pkg/provider"
+	"github.com/DotNetAge/gochat/client/openai"
+	"github.com/DotNetAge/gochat/core"
+	"github.com/DotNetAge/gochat/provider"
 )
 
 // MemoryTokenStore 是一个完全自定义的基于内存的 TokenStore 示例
@@ -66,13 +65,12 @@ func TestCustomTokenStore(t *testing.T) {
 		fmt.Printf("Refreshed Token: %v\n", token.Access)
 	}
 
-	_, err = compatible.New(compatible.Config{
-		Config: base.Config{
-			AuthToken: "any-token",
-			Model:     provider.QwenPortalModelCoder,
-			BaseURL:   "https://portal.qwen.ai",
-		},
+	_, err = openai.NewOpenAI(core.Config{
+		AuthToken: "any-token",
+		Model:     provider.QwenPortalModelCoder,
+		BaseURL:   "https://portal.qwen.ai",
 	})
+
 	if err != nil {
 		t.Fatalf("Failed to create client: %v", err)
 	}

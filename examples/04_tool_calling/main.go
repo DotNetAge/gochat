@@ -15,9 +15,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/DotNetAge/gochat/pkg/client/base"
-	"github.com/DotNetAge/gochat/pkg/client/openai"
-	"github.com/DotNetAge/gochat/pkg/core"
+	"github.com/DotNetAge/gochat/client/openai"
+	"github.com/DotNetAge/gochat/core"
 )
 
 // Define a simple weather tool
@@ -27,11 +26,9 @@ func getWeather(location string, unit string) string {
 }
 
 func main() {
-	client, err := openai.New(openai.Config{
-		Config: base.Config{
-			APIKey: "OPENAI_API_KEY",
-			Model:  "gpt-3.5-turbo",
-		},
+	client, err := openai.NewOpenAI(core.Config{
+		APIKey: "OPENAI_API_KEY",
+		Model:  "gpt-3.5-turbo",
 	})
 	if err != nil {
 		log.Fatal(err)
