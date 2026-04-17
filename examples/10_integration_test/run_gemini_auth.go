@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/DotNetAge/gochat/core"
-	"github.com/DotNetAge/gochat/provider"
+	"github.com/DotNetAge/gochat/auth"
 )
 
 func main() {
@@ -18,10 +17,10 @@ func main() {
 	listenAddr := ":8080"
 
 	// 初始化 Provider
-	p := provider.NewGeminiProvider(clientID, clientSecret, callbackURL, listenAddr)
+	p := auth.NewGeminiProvider(clientID, clientSecret, callbackURL, listenAddr)
 
 	// 初始化 AuthManager
-	authMgr := core.NewAuthManager(p, "gemini_token.json")
+	authMgr := auth.NewAuthManager(p, "gemini_token.json")
 
 	// GetToken 会触发 Authenticate() -> 启动本地 Web 服务器 -> 挂起等待浏览器回调
 	fmt.Println("[Info] Attempting to get Gemini token (will start local server if no token exists)...")

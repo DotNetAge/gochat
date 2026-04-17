@@ -1,4 +1,4 @@
-package core
+package auth
 
 // OAuthToken represents an OAuth token received from an AI provider.
 // It contains the credentials needed to authenticate API requests,

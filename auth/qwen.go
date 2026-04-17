@@ -1,4 +1,4 @@
-package provider
+package auth
 
 import (
 	"bytes"
@@ -7,8 +7,6 @@ import (
 	"io"
 	"net/http"
 	"time"
-
-	"github.com/DotNetAge/gochat/core"
 )
 
 // Undocumented Qwen Portal Constants discovered via testing
@@ -26,8 +24,8 @@ const (
 // QwenProvider Qwen 提供商
 type QwenProvider struct {
 	HTTPClient    *http.Client
-	TokenHelper   *core.TokenHelper
-	PKCEHelper    *core.PKCEHelper
+	TokenHelper   *TokenHelper
+	PKCEHelper    *PKCEHelper
 	DeviceCodeURL string // For testing override
 	TokenURL      string // For testing override
 }
@@ -36,8 +34,8 @@ type QwenProvider struct {
 func NewQwenProvider() *QwenProvider {
 	return &QwenProvider{
 		HTTPClient:    &http.Client{Timeout: 30 * time.Second},
-		TokenHelper:   &core.TokenHelper{},
-		PKCEHelper:    &core.PKCEHelper{},
+		TokenHelper:   &TokenHelper{},
+		PKCEHelper:    &PKCEHelper{},
 		DeviceCodeURL: "https://chat.qwen.ai/api/v1/oauth2/device/code",
 		TokenURL:      "https://chat.qwen.ai/api/v1/oauth2/token",
 	}
@@ -107,7 +105,7 @@ func (p *QwenProvider) RequestDeviceCode() (*QwenDeviceAuthorization, string, er
 }
 
 // PollForToken 轮询获取令牌
-func (p *QwenProvider) PollForToken(deviceCode, verifier string) (status string, token *core.OAuthToken, slowDown bool, errorMsg string) {
+func (p *QwenProvider) PollForToken(deviceCode, verifier string) (status string, token *OAuthToken, slowDown bool, errorMsg string) {
 	requestBody := "grant_type=urn:ietf:params:oauth:grant-type:device_code&client_id=f0304373b74a44d2b584a3fb70ca9e56&device_code=" + deviceCode + "&code_verifier=" + verifier
 
 	req, err := http.NewRequest("POST", p.TokenURL, bytes.NewBufferString(requestBody))
@@ -166,7 +164,7 @@ func (p *QwenProvider) PollForToken(deviceCode, verifier string) (status string,
 		return "error", nil, false, "Qwen OAuth returned incomplete token payload"
 	}
 
-	token = &core.OAuthToken{
+	token = &OAuthToken{
 		Access:  tokenResp.AccessToken,
 		Refresh: tokenResp.RefreshToken,
 		Expires: time.Now().UnixMilli() + int64(tokenResp.ExpiresIn*1000),
@@ -180,7 +178,7 @@ func (p *QwenProvider) PollForToken(deviceCode, verifier string) (status string,
 }
 
 // Authenticate 执行认证流程
-func (p *QwenProvider) Authenticate() (*core.OAuthToken, error) {
+func (p *QwenProvider) Authenticate() (*OAuthToken, error) {
 	deviceCode, verifier, err := p.RequestDeviceCode()
 	if err != nil {
 		return nil, err
@@ -228,7 +226,7 @@ func (p *QwenProvider) Authenticate() (*core.OAuthToken, error) {
 }
 
 // RefreshToken 刷新令牌
-func (p *QwenProvider) RefreshToken(refreshToken string) (*core.OAuthToken, error) {
+func (p *QwenProvider) RefreshToken(refreshToken string) (*OAuthToken, error) {
 	requestBody := "grant_type=refresh_token&client_id=f0304373b74a44d2b584a3fb70ca9e56&refresh_token=" + refreshToken
 
 	req, err := http.NewRequest("POST", p.TokenURL, bytes.NewBufferString(requestBody))
@@ -267,7 +265,7 @@ func (p *QwenProvider) RefreshToken(refreshToken string) (*core.OAuthToken, erro
 		return nil, fmt.Errorf("Qwen OAuth refresh response missing access token or expires_in")
 	}
 
-	token := &core.OAuthToken{
+	token := &OAuthToken{
 		Access:  tokenResp.AccessToken,
 		Refresh: tokenResp.RefreshToken,
 		Expires: time.Now().UnixMilli() + int64(tokenResp.ExpiresIn*1000),

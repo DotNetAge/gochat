@@ -1,4 +1,4 @@
-package provider
+package auth
 
 import (
 	"bytes"
@@ -7,15 +7,13 @@ import (
 	"io"
 	"net/http"
 	"time"
-
-	"github.com/DotNetAge/gochat/core"
 )
 
 // MiniMaxProvider MiniMax 提供商
 type MiniMaxProvider struct {
 	HTTPClient    *http.Client
-	TokenHelper   *core.TokenHelper
-	PKCEHelper    *core.PKCEHelper
+	TokenHelper   *TokenHelper
+	PKCEHelper    *PKCEHelper
 	Region        string
 	BaseURL       string
 	ClientID      string
@@ -35,8 +33,8 @@ func NewMiniMaxProvider(region string) *MiniMaxProvider {
 
 	return &MiniMaxProvider{
 		HTTPClient:    &http.Client{Timeout: 10 * time.Second},
-		TokenHelper:   &core.TokenHelper{},
-		PKCEHelper:    &core.PKCEHelper{},
+		TokenHelper:   &TokenHelper{},
+		PKCEHelper:    &PKCEHelper{},
 		Region:        region,
 		BaseURL:       baseURL,
 		ClientID:      clientID,
@@ -117,7 +115,7 @@ func (p *MiniMaxProvider) RequestOAuthCode() (*MiniMaxOAuthAuthorization, string
 }
 
 // PollOAuthToken 轮询 OAuth 令牌
-func (p *MiniMaxProvider) PollOAuthToken(userCode, verifier string) (status string, token *core.OAuthToken, errorMsg string) {
+func (p *MiniMaxProvider) PollOAuthToken(userCode, verifier string) (status string, token *OAuthToken, errorMsg string) {
 	requestBody := "grant_type=urn:ietf:params:oauth:grant-type:user_code&client_id=" + p.ClientID + "&user_code=" + userCode + "&code_verifier=" + verifier
 
 	req, err := http.NewRequest("POST", p.OAuthTokenURL, bytes.NewBufferString(requestBody))
@@ -175,7 +173,7 @@ func (p *MiniMaxProvider) PollOAuthToken(userCode, verifier string) (status stri
 		return "error", nil, "MiniMax OAuth returned incomplete token payload"
 	}
 
-	token = &core.OAuthToken{
+	token = &OAuthToken{
 		Access:  payload.AccessToken,
 		Refresh: payload.RefreshToken,
 		Expires: payload.ExpiredIn, // MiniMax 直接返回 Unix 时间戳
@@ -193,7 +191,7 @@ func (p *MiniMaxProvider) PollOAuthToken(userCode, verifier string) (status stri
 }
 
 // Authenticate 执行认证流程
-func (p *MiniMaxProvider) Authenticate() (*core.OAuthToken, error) {
+func (p *MiniMaxProvider) Authenticate() (*OAuthToken, error) {
 	auth, verifier, _, err := p.RequestOAuthCode()
 	if err != nil {
 		return nil, err
@@ -232,7 +230,7 @@ func (p *MiniMaxProvider) Authenticate() (*core.OAuthToken, error) {
 }
 
 // RefreshToken 刷新令牌
-func (p *MiniMaxProvider) RefreshToken(refreshToken string) (*core.OAuthToken, error) {
+func (p *MiniMaxProvider) RefreshToken(refreshToken string) (*OAuthToken, error) {
 	requestBody := "grant_type=refresh_token&client_id=" + p.ClientID + "&refresh_token=" + refreshToken
 
 	req, err := http.NewRequest("POST", p.OAuthTokenURL, bytes.NewBufferString(requestBody))
@@ -274,7 +272,7 @@ func (p *MiniMaxProvider) RefreshToken(refreshToken string) (*core.OAuthToken, e
 		return nil, fmt.Errorf("MiniMax OAuth returned incomplete refresh token payload")
 	}
 
-	token := &core.OAuthToken{
+	token := &OAuthToken{
 		Access:  payload.AccessToken,
 		Refresh: payload.RefreshToken,
 		Expires: payload.ExpiredIn,

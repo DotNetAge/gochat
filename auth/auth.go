@@ -1,10 +1,16 @@
-package core
+package auth
 
 import (
 	"fmt"
 	"sync"
 	"time"
 )
+
+type AuthClientProvider interface {
+	GetProviderName() string
+	Authenticate() (*OAuthToken, error)
+	RefreshToken(refreshToken string) (*OAuthToken, error)
+}
 
 // defaultTokenExpiryBuffer is the default buffer time before token expiration
 // to trigger a refresh. If a token expires within this duration, it will
@@ -28,11 +34,7 @@ const defaultTokenExpiryBuffer = 60 * time.Second
 //	token, err := manager.GetToken()
 //	// use token for API requests
 type AuthManager struct {
-	provider interface {
-		GetProviderName() string
-		Authenticate() (*OAuthToken, error)
-		RefreshToken(refreshToken string) (*OAuthToken, error)
-	}
+	provider     AuthClientProvider
 	token        *OAuthToken
 	store        TokenStore
 	mu           sync.RWMutex
@@ -49,11 +51,7 @@ type AuthManager struct {
 //   - filename: Path to the file where tokens are stored
 //
 // Returns a configured AuthManager
-func NewAuthManager(provider interface {
-	GetProviderName() string
-	Authenticate() (*OAuthToken, error)
-	RefreshToken(refreshToken string) (*OAuthToken, error)
-}, filename string) *AuthManager {
+func NewAuthManager(provider AuthClientProvider, filename string) *AuthManager {
 	return &AuthManager{
 		provider:     provider,
 		store:        NewFileTokenStore(filename),
@@ -69,11 +67,7 @@ func NewAuthManager(provider interface {
 //   - store: Custom implementation of TokenStore
 //
 // Returns a configured AuthManager
-func NewAuthManagerWithStore(provider interface {
-	GetProviderName() string
-	Authenticate() (*OAuthToken, error)
-	RefreshToken(refreshToken string) (*OAuthToken, error)
-}, store TokenStore) *AuthManager {
+func NewAuthManagerWithStore(provider AuthClientProvider, store TokenStore) *AuthManager {
 	return &AuthManager{
 		provider:     provider,
 		store:        store,

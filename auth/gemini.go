@@ -1,4 +1,4 @@
-package provider
+package auth
 
 import (
 	"bytes"
@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"time"
-
-	"github.com/DotNetAge/gochat/core"
 )
 
 // GeminiProvider Gemini 提供商 (标准 OAuth2 Authorization Code Flow)
@@ -41,7 +39,7 @@ func (p *GeminiProvider) GetProviderName() string {
 }
 
 // Authenticate 执行标准 OAuth2 授权码流程
-func (p *GeminiProvider) Authenticate() (*core.OAuthToken, error) {
+func (p *GeminiProvider) Authenticate() (*OAuthToken, error) {
 	// 1. 构建 Google OAuth2 授权链接
 	scope := "https://www.googleapis.com/auth/generative-language.retriever"
 	authURL := fmt.Sprintf(
@@ -109,7 +107,7 @@ func (p *GeminiProvider) Authenticate() (*core.OAuthToken, error) {
 }
 
 // exchangeCodeForToken 授权码换取令牌
-func (p *GeminiProvider) exchangeCodeForToken(code string) (*core.OAuthToken, error) {
+func (p *GeminiProvider) exchangeCodeForToken(code string) (*OAuthToken, error) {
 	data := url.Values{}
 	data.Set("client_id", p.ClientID)
 	data.Set("client_secret", p.ClientSecret)
@@ -148,7 +146,7 @@ func (p *GeminiProvider) exchangeCodeForToken(code string) (*core.OAuthToken, er
 		return nil, err
 	}
 
-	return &core.OAuthToken{
+	return &OAuthToken{
 		Access:  tokenResp.AccessToken,
 		Refresh: tokenResp.RefreshToken,
 		Expires: time.Now().UnixMilli() + int64(tokenResp.ExpiresIn*1000),
@@ -156,7 +154,7 @@ func (p *GeminiProvider) exchangeCodeForToken(code string) (*core.OAuthToken, er
 }
 
 // RefreshToken 刷新令牌
-func (p *GeminiProvider) RefreshToken(refreshToken string) (*core.OAuthToken, error) {
+func (p *GeminiProvider) RefreshToken(refreshToken string) (*OAuthToken, error) {
 	data := url.Values{}
 	data.Set("client_id", p.ClientID)
 	data.Set("client_secret", p.ClientSecret)
@@ -193,7 +191,7 @@ func (p *GeminiProvider) RefreshToken(refreshToken string) (*core.OAuthToken, er
 		return nil, err
 	}
 
-	return &core.OAuthToken{
+	return &OAuthToken{
 		Access:  tokenResp.AccessToken,
 		Refresh: refreshToken,
 		Expires: time.Now().UnixMilli() + int64(tokenResp.ExpiresIn*1000),

@@ -2,7 +2,7 @@
 <h1>🚀 GoChat</h1>
 
 <p><b>
-GoChat is a <b>modern, enterprise-ready Go client SDK for Large Language Models (LLMs)</b>. It provides an exceptionally elegant and type-safe unified interface that completely smooths out the chaotic API differences between OpenAI, Anthropic (Claude), DeepSeek, Qwen, Ollama, and other major cloud providers or local models.
+GoChat is a modern, enterprise-ready Go client SDK for Large Language Models (LLMs). It provides an elegant and type-safe unified interface that completely smooths out the API differences between OpenAI, Anthropic (Claude), DeepSeek, Qwen, Ollama, and other major cloud providers or local models.
 </b></p>
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/DotNetAge/gochat.svg)](https://pkg.go.dev/github.com/DotNetAge/gochat)
@@ -15,7 +15,7 @@ GoChat is a <b>modern, enterprise-ready Go client SDK for Large Language Models 
 
 <p>
 
-[<b>English</b>](README.md) | [简体中文](README_zh.md)
+[**English**](README.md) | [简体中文](README_zh.md)
 
 </p>
 </div>
@@ -27,10 +27,9 @@ GoChat is a <b>modern, enterprise-ready Go client SDK for Large Language Models 
 ## ✨ Core Features (Why GoChat?)
 
 - **🔌 Unified Interface**: Provides a consistent API interface that shields differences between different LLM providers
-- **Unified Tool Calling**: Define tools once, automatically convert to the corresponding provider's tool calling format
-- **Built-in Anti-Fragility Mechanism**: Automatically captures HTTP 429 rate limits and network fluctuations, triggering exponential backoff with jitter retry
-- **Workflow Orchestration**: Elegantly organize complex RAG or Agent reasoning flows through Pipeline
-- **Strongly-Typed Context Transfer**: Leverage Go 1.24+ generics to seamlessly pass custom strongly-typed structs between steps
+- **🏗️ Builder Pattern**: Chain calls, complete LLM requests in a single line of code
+- **🔐 OAuth2 Support**: Built-in OAuth2 device code authentication for Qwen, Gemini, MiniMax
+- **🔗 Workflow Orchestration**: Elegantly organize complex RAG or Agent reasoning flows through Pipeline
 
 ---
 
@@ -44,89 +43,224 @@ go get github.com/DotNetAge/gochat
 
 ## 🚀 Quick Start
 
-### 1. Create Client
+### 1. Client - LLM Calls
+
+Using the Builder pattern makes LLM calls extremely simple:
 
 ```go
-import (
-    "github.com/DotNetAge/gochat/core"
-    "github.com/DotNetAge/gochat/client/openai"
-)
+import "github.com/DotNetAge/gochat"
 
-// Create OpenAI client
-client, err := openai.NewOpenAI(core.Config{
-    APIKey: "your-api-key",
-    Model:  "gpt-4o",
-})
+// Create Builder and send request
+resp, err := gochat.NewClientBuilder().
+    Init(gochat.Config{APIKey: "your-api-key"}).
+    Model("gpt-4o").
+    Temperature(0.7).
+    UserMessage("Hello, please introduce the Go language").
+    GetResponse(gochat.OpenAIClient)
+
 if err != nil {
     log.Fatal(err)
 }
+fmt.Println(resp.Content)
 ```
 
-### 2. Send Message
+**Streaming Response:**
 
 ```go
-import "github.com/DotNetAge/gochat/core"
+stream, err := gochat.NewClientBuilder().
+    Init(gochat.Config{APIKey: "your-api-key"}).
+    Model("gpt-4o").
+    UserMessage("Write a poem about spring").
+    GetStream(gochat.OpenAIClient)
 
-// Create messages
-messages := []core.Message{
-    core.NewSystemMessage("You are a helpful assistant."),
-    core.NewUserMessage("Hello, who are you?"),
-}
-
-// Send message
-response, err := client.Chat(ctx, messages)
-if err != nil {
-    log.Fatal(err)
-}
-
-fmt.Println(response.Content)
-```
-
-### 3. Streaming Response
-
-```go
-// Send streaming request
-stream, err := client.ChatStream(ctx, messages)
 if err != nil {
     log.Fatal(err)
 }
 defer stream.Close()
 
-// Process streaming response
 for stream.Next() {
     event := stream.Event()
     fmt.Print(event.Content)
 }
-
-if err := stream.Err(); err != nil {
-    log.Fatal(err)
-}
 ```
 
-### 4. Use Pipeline
+**Supported Client Types:**
+
+| Constant | Provider |
+|----------|----------|
+| `gochat.OpenAIClient` | OpenAI / Compatible API |
+| `gochat.AnthropicClient` | Anthropic Claude |
+| `gochat.DeepSeekClient` | DeepSeek |
+| `gochat.OllamaClient` | Ollama Local Models |
+| `gochat.AzureClient` | Azure OpenAI |
+
+**More Builder Methods:**
 
 ```go
-import (
-    "github.com/DotNetAge/gochat/pipeline"
-    "github.com/DotNetAge/gochat/pipeline/steps"
-)
+gochat.NewClientBuilder().
+    Init(config).
+    Model("gpt-4o").           // Set model
+    Temperature(0.7).          // Set temperature
+    MaxTokens(1000).           // Max tokens
+    TopP(0.9).                 // Top-p sampling
+    Stop("###", "END").        // Stop sequences
+    EnableThinking(true).      // Enable thinking mode
+    ThinkingBudget(1024).      // Thinking budget
+    EnableSearch(true).        // Enable search
+    SysemMessage("You are an assistant"). // System message
+    UserMessage("User message").   // User message
+    AssistantMessage("Assistant message"). // Assistant message
+    AttachFile(attachment).    // Attach file
+    AttachImage(image).        // Attach image
+    Tools(tool).               // Tools
+    UsageCallback(func(u core.Usage) {
+        fmt.Printf("Token usage: %d\n", u.TotalTokens)
+    }).
+    GetResponse(gochat.OpenAIClient)
+```
 
-// Create Pipeline
-p := pipeline.New[*pipeline.State]().
-    AddStep(steps.NewTemplateStep("User question: {{.query}}", "prompt", "query")).
-    AddStep(steps.NewGenerateCompletionStep(client, "prompt", "answer", "gpt-4o"))
+---
 
-// Create state
-state := pipeline.NewState()
-state.Set("query", "What is GoChat?")
+### 2. Auth - OAuth2 Authentication
 
-// Execute Pipeline
-err := p.Execute(ctx, state)
+GoChat has built-in OAuth2 device code authentication support for Qwen, Gemini, and MiniMax:
+
+#### Qwen
+
+```go
+import "github.com/DotNetAge/gochat/auth"
+
+// Create AuthManager
+manager := auth.Qwen()
+
+// Login to get token (will print verification link and code)
+if err := manager.Login(); err != nil {
+    log.Fatal(err)
+}
+
+// Get token for API calls
+token, err := manager.GetToken()
 if err != nil {
     log.Fatal(err)
 }
 
+// Use token to create client
+resp, err := gochat.NewClientBuilder().
+    Init(core.Config{AuthToken: token.Access}).
+    Model("qwen-max").
+    UserMessage("Hello").
+    GetResponse(gochat.OpenAIClient)
+```
+
+#### Gemini
+
+```go
+// Need to provide OAuth2 configuration
+manager := auth.GeminiWithConfig(
+    "your-client-id",
+    "your-client-secret",
+    "http://localhost:8080/callback",
+    ":8080",
+)
+
+if err := manager.Login(); err != nil {
+    log.Fatal(err)
+}
+```
+
+#### MiniMax
+
+```go
+// "cn" for China version, other values for international version
+manager := auth.MiniMax("cn")
+
+if err := manager.Login(); err != nil {
+    log.Fatal(err)
+}
+```
+
+**Token Persistence:**
+
+```go
+// Specify token file path
+manager := auth.Qwen("/path/to/qwen_token.json")
+
+// First login
+manager.Login()
+
+// Automatically load saved token on subsequent startups
+token, err := manager.GetToken()
+```
+
+---
+
+### 3. Pipeline - Workflow Orchestration
+
+Pipeline is used to organize complex LLM workflows:
+
+```go
+import (
+    "github.com/DotNetAge/gochat"
+    "github.com/DotNetAge/gochat/pipeline"
+    "github.com/DotNetAge/gochat/pipeline/steps"
+)
+
+// Create client
+client, _ := openai.NewOpenAI(core.Config{
+    APIKey: "your-api-key",
+    Model:  "gpt-4o",
+})
+
+// Create Pipeline
+p := pipeline.New[*pipeline.State]().
+    AddStep(steps.NewTemplateStep(
+        "Please answer the following question: {{.question}}",
+        "prompt",
+        "question",
+    )).
+    AddStep(steps.NewGenerateCompletionStep(client, "prompt", "answer", "gpt-4o"))
+
+// Create state and set input
+state := pipeline.NewState()
+state.Set("question", "What is Go language?")
+
+// Execute Pipeline
+if err := p.Execute(ctx, state); err != nil {
+    log.Fatal(err)
+}
+
+// Get result
 fmt.Println(state.GetString("answer"))
+```
+
+**Built-in Step Types:**
+
+| Step | Function |
+|------|----------|
+| `NewTemplateStep` | Template rendering, render state variables into prompts |
+| `NewGenerateCompletionStep` | Call LLM to generate response |
+
+**Add Hook to Monitor Execution:**
+
+```go
+type LoggerHook struct{}
+
+func (h *LoggerHook) OnStepStart(ctx context.Context, step pipeline.Step[*pipeline.State], state *pipeline.State) {
+    fmt.Printf("[%s] Started\n", step.Name())
+}
+
+func (h *LoggerHook) OnStepComplete(ctx context.Context, step pipeline.Step[*pipeline.State], state *pipeline.State) {
+    fmt.Printf("[%s] Completed\n", step.Name())
+}
+
+func (h *LoggerHook) OnStepError(ctx context.Context, step pipeline.Step[*pipeline.State], state *pipeline.State, err error) {
+    fmt.Printf("[%s] Failed: %v\n", step.Name(), err)
+}
+
+p := pipeline.New[*pipeline.State]().
+    AddStep(step1).
+    AddStep(step2).
+    AddHook(&LoggerHook{})
 ```
 
 ---
@@ -147,247 +281,19 @@ fmt.Println(state.GetString("answer"))
 
 ## 🏗️ Project Architecture
 
-GoChat adopts a modular architecture design, separating different functions into independent packages to achieve high scalability and maintainability.
-
-### Overall Architecture
-
 ```
 gochat/
+├── gochat.go       # Builder pattern entry
 ├── client/         # LLM provider client implementations
-│   ├── anthropic/  # Anthropic (Claude) client
-│   ├── azureopenai/ # Azure OpenAI client
-│   ├── deepseek/   # DeepSeek client
-│   ├── ollama/     # Ollama local model client
-│   └── openai/     # OpenAI client
 ├── core/           # Core interfaces and common functionality
+├── auth/           # OAuth2 authentication module
 ├── pipeline/       # Workflow orchestration functionality
 ├── provider/       # Additional provider implementations
 ├── docs/           # Documentation
 └── examples/       # Example code
 ```
 
-### Core Modules
-
-- **Core Module**: Defines core interfaces and common functionality, serving as the foundation of the library
-- **Client Module**: Contains specific implementations for various LLM providers
-- **Pipeline Module**: Provides workflow orchestration functionality, allowing users to combine independent steps into complex processes
-- **Provider Module**: Contains additional provider implementations such as Gemini, Minimax, and Qwen
-
-## 4. Key Classes and Functions
-
-### 4.1 Core Module
-
-#### Client Interface
-
-```go
-type Client interface {
-    Chat(ctx context.Context, messages []Message, opts ...Option) (*Response, error)
-    ChatStream(ctx context.Context, messages []Message, opts ...Option) (*Stream, error)
-}
-```
-
-- **Parameters**:
-  - `ctx`: Context for cancellation and timeout
-  - `messages`: Conversation messages
-  - `opts`: Optional parameters (temperature, max tokens, tools, etc.)
-
-- **Return Values**:
-  - `Chat`: Returns complete response and error
-  - `ChatStream`: Returns event stream and error
-
-#### Message-related Functions
-
-- **NewUserMessage(text string) Message**: Creates a user message
-- **NewSystemMessage(text string) Message**: Creates a system message
-- **NewTextMessage(role, text string) Message**: Creates a text message
-
-#### Option-related Functions
-
-- **WithTemperature(t float64) Option**: Sets temperature
-- **WithMaxTokens(t int) Option**: Sets maximum tokens
-- **WithTools(tools []Tool) Option**: Sets tools
-- **WithThinking(level int) Option**: Enables thinking mode
-
-### 4.2 Client Module
-
-#### OpenAI Client
-
-```go
-func NewOpenAI(config core.Config) (*Client, error)
-```
-
-- **Parameters**:
-  - `config`: Contains API key, model name, base URL, etc.
-
-- **Return Values**:
-  - OpenAI client instance and error
-
-#### Anthropic Client
-
-```go
-func NewAnthropic(config core.Config) (*Client, error)
-```
-
-- **Parameters**:
-  - `config`: Contains API key, model name, etc.
-
-- **Return Values**:
-  - Anthropic client instance and error
-
-### 4.3 Pipeline Module
-
-#### Pipeline-related Functions
-
-```go
-func New[T any]() *Pipeline[T]
-func (p *Pipeline[T]) AddStep(step Step[T]) *Pipeline[T]
-func (p *Pipeline[T]) Execute(ctx context.Context, state T) error
-```
-
-- **Parameters**:
-  - `step`: Step to add
-  - `ctx`: Context for cancellation
-  - `state`: State object passed to each step
-
-- **Return Values**:
-  - `New`: Returns new Pipeline instance
-  - `AddStep`: Returns Pipeline instance for method chaining
-  - `Execute`: Returns execution error
-
-#### Step-related Functions
-
-```go
-func NewTemplateStep(template, outputKey, inputKeys ...string) Step[*State]
-func NewGenerateCompletionStep(client core.Client, inputKey, outputKey, model string) Step[*State]
-```
-
-- **Parameters**:
-  - `template`: Template string
-  - `outputKey`: Output key
-  - `inputKeys`: Input keys
-  - `client`: LLM client
-  - `model`: Model name
-
-- **Return Values**:
-  - Step instance
-
-## 5. Dependencies
-
-GoChat's main dependencies are as follows:
-
-| Dependency | Purpose | Source |
-|------------|---------|--------|
-| Go 1.24+ | Basic language environment, supports generics | [golang.org](https://golang.org/) |
-| net/http | HTTP client | Standard library |
-| encoding/json | JSON serialization and deserialization | Standard library |
-| context | Context management | Standard library |
-
-## 🔧 Configuration and Deployment
-
-### Configuration Options
-
-GoChat's configuration is primarily managed through the `core.Config` struct:
-
-```go
-type Config struct {
-    APIKey     string            // API key
-    AuthToken  string            // Authentication token
-    Model      string            // Model name
-    BaseURL    string            // API base URL
-    HTTPClient *http.Client      // Custom HTTP client
-    Headers    map[string]string // Custom HTTP headers
-}
-```
-
-### Environment Variables
-
-GoChat supports reading configuration from environment variables:
-
-- `GOCHAT_API_KEY`: API key
-- `GOCHAT_MODEL`: Default model name
-- `GOCHAT_BASE_URL`: API base URL
-
-### Deployment Recommendations
-
-- **Production Environment**: It is recommended to use environment variables to store API keys to avoid hardcoding
-- **High Concurrency Scenarios**: It is recommended to use a custom HTTP client with reasonable timeout and connection pool configurations
-- **Fault Tolerance**: It is recommended to implement retry mechanisms and error handling to improve system stability
-
-## 📊 Monitoring and Maintenance
-
-### Logging
-
-GoChat supports logging through the Pipeline's Hook mechanism:
-
-```go
-// Implement Hook interface
-type LoggerHook struct{}
-
-func (h *LoggerHook) OnStepStart(ctx context.Context, step pipeline.Step[*pipeline.State], state *pipeline.State) {
-    fmt.Printf("Step %s started\n", step.Name())
-}
-
-func (h *LoggerHook) OnStepComplete(ctx context.Context, step pipeline.Step[*pipeline.State], state *pipeline.State) {
-    fmt.Printf("Step %s completed\n", step.Name())
-}
-
-func (h *LoggerHook) OnStepError(ctx context.Context, step pipeline.Step[*pipeline.State], state *pipeline.State, err error) {
-    fmt.Printf("Step %s error: %v\n", step.Name(), err)
-}
-
-// Add Hook
-p := pipeline.New[*pipeline.State]().
-    AddStep(step1).
-    AddHook(&LoggerHook{})
-```
-
-### Error Handling
-
-GoChat provides detailed error types:
-
-- `ValidationError`: Parameter validation error
-- `NetworkError`: Network error
-- `APIError`: Error returned by the API
-- `RateLimitError`: Rate limit error
-
-It is recommended to implement appropriate error handling when using GoChat:
-
-```go
-response, err := client.Chat(ctx, messages)
-if err != nil {
-    switch e := err.(type) {
-    case *core.RateLimitError:
-        // Handle rate limit
-        time.Sleep(e.RetryAfter)
-    case *core.NetworkError:
-        // Handle network error
-        retryCount++
-    default:
-        // Handle other errors
-        log.Fatal(err)
-    }
-}
-```
-
-## 📁 Example Code
-
-GoChat provides rich example code in the `examples/` directory:
-
-| Example | Functionality | Path |
-|---------|---------------|------|
-| 01_basic_chat | Basic chat functionality | [examples/01_basic_chat/main.go](file:///Users/ray/workspaces/ai-ecosystem/gochat/examples/01_basic_chat/main.go) |
-| 02_multi_turn | Multi-turn conversation | [examples/02_multi_turn/main.go](file:///Users/ray/workspaces/ai-ecosystem/gochat/examples/02_multi_turn/main.go) |
-| 03_streaming | Streaming response | [examples/03_streaming/main.go](file:///Users/ray/workspaces/ai-ecosystem/gochat/examples/03_streaming/main.go) |
-| 04_tool_calling | Tool calling | [examples/04_tool_calling/main.go](file:///Users/ray/workspaces/ai-ecosystem/gochat/examples/04_tool_calling/main.go) |
-| 05_multiple_providers | Multiple providers | [examples/05_multiple_providers/main.go](file:///Users/ray/workspaces/ai-ecosystem/gochat/examples/05_multiple_providers/main.go) |
-| 06_image_input | Image input | [examples/06_image_input/main.go](file:///Users/ray/workspaces/ai-ecosystem/gochat/examples/06_image_input/main.go) |
-| 07_document_analysis | Document analysis | [examples/07_document_analysis/main.go](file:///Users/ray/workspaces/ai-ecosystem/gochat/examples/07_document_analysis/main.go) |
-| 08_multiple_images | Multiple image input | [examples/08_multiple_images/main.go](file:///Users/ray/workspaces/ai-ecosystem/gochat/examples/08_multiple_images/main.go) |
-| 09_helper_utilities | Helper utilities | [examples/09_helper_utilities/main.go](file:///Users/ray/workspaces/ai-ecosystem/gochat/examples/09_helper_utilities/main.go) |
-
-## 🎯 Design Philosophy
-
-GoChat adheres to Go's philosophy of minimalism: The core interface `core.Client` has only two methods, `Chat` and `ChatStream`. All personalization features are elegantly extended through **Functional Options**, ensuring the main interface remains long-term stable and uncontaminated.
+---
 
 ## 📄 License
 
@@ -404,15 +310,3 @@ Please refer to the `docs/` directory for detailed guides, architecture diagrams
 - ⛓️ [Pipeline Module (Workflow Orchestration)](https://gochat.rayainfo.cn/modules/pipeline/)
 - 🏢 [Provider Module (OAuth2 Authentication)](https://gochat.rayainfo.cn/modules/provider/)
 - 📋 [API Reference](https://gochat.rayainfo.cn/api_reference/)
-
-## 📝 Summary and Highlights
-
-GoChat is a powerful, elegantly designed Go language LLM client SDK with the following core advantages:
-
-- **Unified Interface**: Shield API differences between different LLM providers, achieving "write once, run anywhere"
-- **Type Safety**: Leverage Go's type system and generics to provide a type-safe API
-- **Powerful Workflow Orchestration**: Elegantly organize complex logic through Pipeline
-- **Built-in Anti-Fragility Mechanism**: Automatically handle network fluctuations and rate limits
-- **Rich Examples**: Provide comprehensive example code to help users get started quickly
-
-With GoChat, developers can focus more on business logic rather than dealing with API differences between different LLM providers, thereby building LLM-based applications more efficiently.
