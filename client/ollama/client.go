@@ -52,11 +52,13 @@ type toolDefinition struct {
 }
 
 type ollamaRequest struct {
-	Model    string           `json:"model"`
-	Messages []ollamaMessage  `json:"messages"`
-	Stream   bool             `json:"stream,omitempty"`
-	Options  *ollamaOptions   `json:"options,omitempty"`
-	Tools    []toolDefinition `json:"tools,omitempty"`
+	Model     string           `json:"model"`
+	Messages  []ollamaMessage  `json:"messages"`
+	Stream    bool             `json:"stream,omitempty"`
+	Options   *ollamaOptions   `json:"options,omitempty"`
+	Tools     []toolDefinition `json:"tools,omitempty"`
+	Format    string           `json:"format,omitempty"`    // json mode
+	KeepAlive string           `json:"keep_alive,omitempty"` // duration to keep model in memory
 }
 
 type ollamaOptions struct {
@@ -86,9 +88,14 @@ func NewOllamaClient(config core.Config) (*Client, error) {
 
 	baseClient := core.NewClient(config)
 
-	return &Client{
+	client := &Client{
 		BaseClient: baseClient,
-	}, nil
+	}
+
+	client.SetChatFunc(client.doChat)
+	client.SetStreamFunc(client.doChatStream)
+
+	return client, nil
 }
 
 // DefaultOllamaClient 创建默认的 Ollama 客户端
@@ -100,34 +107,8 @@ func DefaultOllamaClient() (*Client, error) {
 	})
 }
 
-// Chat performs a non-streaming chat completion
-func (c *Client) Chat(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.Response, error) {
-	options := core.ApplyOptions(opts...)
-	messages = core.ProcessAttachments(messages, options.Attachments)
-
-	var response *core.Response
-	err := c.Retry(ctx, func() error {
-		resp, err := c.doChat(ctx, messages, options, false)
-		if err != nil {
-			return err
-		}
-		response = resp
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	if options.UsageCallback != nil && response.Usage != nil {
-		options.UsageCallback(*response.Usage)
-	}
-
-	return response, nil
-}
-
-// ChatStream performs a streaming chat completion
-func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.Stream, error) {
+// doChatStream performs a streaming chat completion
+func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.Stream, error) {
 	options := core.ApplyOptions(opts...)
 	messages = core.ProcessAttachments(messages, options.Attachments)
 
@@ -394,6 +375,16 @@ func (c *Client) buildRequest(messages []core.Message, options core.Options, str
 		} else if c.Config().MaxTokens > 0 {
 			req.Options.NumPredict = c.Config().MaxTokens
 		}
+	}
+
+	// Add format for JSON mode
+	if options.Format != "" {
+		req.Format = options.Format
+	}
+
+	// Add keep_alive for memory management
+	if options.KeepAlive != "" {
+		req.KeepAlive = options.KeepAlive
 	}
 
 	return req

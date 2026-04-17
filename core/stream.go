@@ -2,6 +2,7 @@ package core
 
 import (
 	"io"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -57,21 +58,12 @@ type StreamEvent struct {
 // It wraps a channel of StreamEvents and provides methods for iterating
 // through the stream, collecting text, and proper resource cleanup.
 //
-// Stream is safe for concurrent use from multiple goroutines.
+// NOTE: Stream is a single-consumer model. While it is thread-safe for
+// concurrent Close() calls, only one goroutine should call Next() at a time
+// to ensure event order and consistency.
+//
 // The Close method should be called when the stream is no longer needed
 // to ensure proper cleanup of underlying resources.
-//
-// Example:
-//
-//	stream := client.ChatStream(ctx, messages)
-//	defer stream.Close()
-//	for stream.Next() {
-//	    event := stream.Event()
-//	    fmt.Print(event.Content)
-//	}
-//	if err := stream.Err(); err != nil {
-//	    // handle error
-//	}
 type Stream struct {
 	ch       <-chan StreamEvent
 	current  StreamEvent
@@ -94,11 +86,17 @@ type Stream struct {
 //
 // Returns a new Stream instance
 func NewStream(ch <-chan StreamEvent, closer io.Closer) *Stream {
-	return &Stream{
+	s := &Stream{
 		ch:     ch,
 		closer: closer,
 		doneCh: make(chan struct{}),
 	}
+	if closer != nil {
+		runtime.SetFinalizer(s, func(obj *Stream) {
+			obj.Close()
+		})
+	}
+	return s
 }
 
 // Next advances the stream to the next event. Returns false if the
@@ -113,27 +111,51 @@ func (s *Stream) Next() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.done {
+	if s.done || s.closed {
 		return false
 	}
 	select {
 	case <-s.doneCh:
 		s.done = true
+		s.autoClose()
 		return false
 	case ev, ok := <-s.ch:
 		if !ok {
 			s.done = true
+			s.autoClose()
 			return false
 		}
 		s.current = ev
 		if ev.Err != nil {
 			s.done = true
+			s.closeInternal()
 		}
 		if ev.Usage != nil {
 			s.usage = ev.Usage
 		}
+		if ev.Type == EventDone {
+			s.done = true
+			s.closeInternal()
+		}
 		return true
 	}
+}
+
+// closeInternal closes the underlying closer without acquiring the lock.
+// This must only be called when the lock is already held.
+func (s *Stream) closeInternal() {
+	if s.closer != nil && !s.closed {
+		s.closer.Close()
+		s.closed = true
+	}
+}
+
+// autoClose attempts to close the underlying closer if the stream is done.
+// It does not wait for the channel to drain like Close() does.
+func (s *Stream) autoClose() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.closeInternal()
 }
 
 // Event returns the most recent event received from the last call to Next.
@@ -167,6 +189,9 @@ func (s *Stream) Close() error {
 	s.closed = true
 	s.done = true
 	s.mu.Unlock()
+
+	// Clear finalizer since we're closing manually
+	runtime.SetFinalizer(s, nil)
 
 	timer := time.NewTimer(streamCloseTimeout)
 	defer timer.Stop()

@@ -20,6 +20,16 @@ import (
 // The client handles authentication, retries, error handling, and streaming
 // automatically. It supports all OpenAI features including tool calling,
 // multimodal inputs, and extended thinking (for o1/o3 models).
+//
+// IMPORTANT FOR ALIBABA CLOUD QWEN USERS:
+// This client uses OpenAI compatibility mode by default (dashscope.aliyuncs.com/compatible-mode/v1).
+// Compatibility mode has limitations:
+// - Does NOT support enable_search (internet search)
+// - Does NOT support enable_thinking (deep thinking mode)
+// - Does NOT support incremental_output
+// - Only supports standard OpenAI parameters
+//
+// For full Qwen feature support, use client/dashscope instead.
 type Client struct {
 	*core.BaseClient
 }
@@ -45,15 +55,10 @@ func NewOpenAI(config core.Config) (*Client, error) {
 	}
 
 	// Inject chat and stream functions
-	client.SetChatFunc(client.doChatInternal)
+	client.SetChatFunc(client.doChat)
 	client.SetStreamFunc(client.doChatStream)
 
 	return client, nil
-}
-
-// ChatStream performs a streaming chat completion
-func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.Stream, error) {
-	return c.doChatStream(ctx, messages, opts...)
 }
 
 // doChatStream performs the actual streaming chat request
@@ -72,10 +77,16 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 		Stop:         options.Stop,
 		Stream:       true,
 		EnableSearch: options.EnableSearch,
+		ThinkingBudget: options.ThinkingBudget,
+		IncrementalOutput: options.IncrementalOutput,
 	}
 
+	// Handle EnableThinking - use pointer to allow explicit false value
 	if options.Thinking {
-		reqBody.ReasoningEffort = "high"
+		reqBody.EnableThinking = &[]bool{true}[0]
+	} else {
+		// Explicitly set to false to disable thinking mode
+		reqBody.EnableThinking = &[]bool{false}[0]
 	}
 
 	if len(options.Tools) > 0 {
@@ -140,22 +151,28 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 	return core.NewStream(ch, resp.Body), nil
 }
 
-// doChatInternal performs the actual chat request
-func (c *Client) doChatInternal(ctx context.Context, messages []core.Message, options core.Options, stream bool) (*core.Response, error) {
+// doChat performs the actual chat request
+func (c *Client) doChat(ctx context.Context, messages []core.Message, options core.Options, stream bool) (*core.Response, error) {
 	model := c.BaseClient.ResolveModel(options)
 	reqBody := ChatCompletionRequest{
-		Model:        model,
-		Messages:     MessagesToWire(messages, options.SystemPrompt),
-		Temperature:  c.BaseClient.ResolveTemperature(options),
-		MaxTokens:    c.BaseClient.ResolveMaxTokens(options),
-		TopP:         c.BaseClient.ResolveTopP(options),
-		Stop:         options.Stop,
-		Stream:       stream,
-		EnableSearch: options.EnableSearch,
+		Model:            model,
+		Messages:         MessagesToWire(messages, options.SystemPrompt),
+		Temperature:      c.BaseClient.ResolveTemperature(options),
+		MaxTokens:        c.BaseClient.ResolveMaxTokens(options),
+		TopP:             c.BaseClient.ResolveTopP(options),
+		Stop:             options.Stop,
+		Stream:           stream,
+		EnableSearch:     options.EnableSearch,
+		ThinkingBudget:   options.ThinkingBudget,
+		IncrementalOutput: options.IncrementalOutput,
 	}
 
+	// Handle EnableThinking - use pointer to allow explicit false value
 	if options.Thinking {
-		reqBody.ReasoningEffort = "high"
+		reqBody.EnableThinking = &[]bool{true}[0]
+	} else {
+		// Explicitly set to false to disable thinking mode
+		reqBody.EnableThinking = &[]bool{false}[0]
 	}
 
 	if len(options.Tools) > 0 {

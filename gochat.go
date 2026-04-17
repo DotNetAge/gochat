@@ -19,6 +19,7 @@ const (
 	DeepSeekClient
 	AzureClient
 	OllamaClient
+	QwenClient // 阿里云通义千问（使用 DashScope API）
 )
 
 type ClientBuilder interface {
@@ -31,6 +32,9 @@ type ClientBuilder interface {
 	EnableThinking(think bool) ClientBuilder
 	ThinkingBudget(budget int) ClientBuilder
 	EnableSearch(search bool) ClientBuilder
+	IncrementalOutput(enabled bool) ClientBuilder // 流式增量输出（DeepSeek, Qwen）
+	Format(format string) ClientBuilder          // 响应格式，如 "json"（Ollama）
+	KeepAlive(duration string) ClientBuilder     // 模型内存保持时长（Ollama）
 	UsageCallback(fn func(core.Usage)) ClientBuilder
 	Attach(attachments ...core.Attachment) ClientBuilder
 	UserMessage(msg string) ClientBuilder
@@ -118,6 +122,24 @@ func (b *defaultClientBuilder) EnableSearch(search bool) ClientBuilder {
 	return b
 }
 
+// IncrementalOutput 启用流式增量输出（DeepSeek, Qwen）
+func (b *defaultClientBuilder) IncrementalOutput(enabled bool) ClientBuilder {
+	b.options = append(b.options, core.WithIncrementalOutput(enabled))
+	return b
+}
+
+// Format 设置响应格式，如 "json"（Ollama）
+func (b *defaultClientBuilder) Format(format string) ClientBuilder {
+	b.options = append(b.options, core.WithFormat(format))
+	return b
+}
+
+// KeepAlive 设置模型内存保持时长（Ollama）
+func (b *defaultClientBuilder) KeepAlive(duration string) ClientBuilder {
+	b.options = append(b.options, core.WithKeepAlive(duration))
+	return b
+}
+
 // UsageCallback 设置用量回调函数
 func (b *defaultClientBuilder) UsageCallback(fn func(core.Usage)) ClientBuilder {
 	b.options = append(b.options, core.WithUsageCallback(fn))
@@ -185,6 +207,13 @@ func (b *defaultClientBuilder) buildClient(clientType ClientType) (core.Client, 
 		return azureopenai.NewAzureOpenAI(azureConfig)
 	case OllamaClient:
 		return ollama.NewOllamaClient(b.config)
+	case QwenClient:
+		// Qwen uses DashScope OpenAI-compatible mode
+		qwenConfig := b.config
+		if qwenConfig.BaseURL == "" {
+			qwenConfig.BaseURL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+		}
+		return openai.NewOpenAI(qwenConfig)
 	default:
 		return nil, core.NewValidationError("unknown client type", nil)
 	}

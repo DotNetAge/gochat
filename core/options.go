@@ -2,18 +2,21 @@ package core
 
 // Options holds per-request parameters
 type Options struct {
-	Model          string
-	Temperature    *float64 // pointer so zero-value is distinguishable from "not set"
-	MaxTokens      *int
-	TopP           *float64
-	Stop           []string
-	Tools          []Tool
-	SystemPrompt   string // prepended as system message if set
-	Thinking       bool   // enables extended thinking/reasoning (provider-dependent)
-	ThinkingBudget int    // max tokens for thinking (0 = provider default)
-	EnableSearch   bool   // Qwen/compatible-mode search
-	UsageCallback  func(Usage)
-	Attachments    []Attachment
+	Model            string
+	Temperature      *float64 // pointer so zero-value is distinguishable from "not set"
+	MaxTokens        *int
+	TopP             *float64
+	Stop             []string
+	Tools            []Tool
+	SystemPrompt     string // prepended as system message if set
+	Thinking         bool   // enables extended thinking/reasoning (provider-dependent)
+	ThinkingBudget   int    // max tokens for thinking (0 = provider default)
+	EnableSearch     bool   // Qwen/compatible-mode search
+	IncrementalOutput bool   // stream incremental output (DeepSeek, Qwen)
+	Format           string // response format, e.g., "json" (Ollama)
+	KeepAlive        string // keep model in memory duration, e.g., "5m" (Ollama)
+	UsageCallback    func(Usage)
+	Attachments      []Attachment
 }
 
 // Option is a functional option for Chat/ChatStream
@@ -66,6 +69,27 @@ func WithThinking(budget int) Option {
 func WithEnableSearch(enabled bool) Option {
 	return func(o *Options) {
 		o.EnableSearch = enabled
+	}
+}
+
+// WithIncrementalOutput enables incremental output for streaming (DeepSeek, Qwen)
+func WithIncrementalOutput(enabled bool) Option {
+	return func(o *Options) {
+		o.IncrementalOutput = enabled
+	}
+}
+
+// WithFormat sets the response format (e.g., "json" for Ollama)
+func WithFormat(format string) Option {
+	return func(o *Options) {
+		o.Format = format
+	}
+}
+
+// WithKeepAlive sets the duration to keep the model in memory (Ollama)
+func WithKeepAlive(duration string) Option {
+	return func(o *Options) {
+		o.KeepAlive = duration
 	}
 }
 

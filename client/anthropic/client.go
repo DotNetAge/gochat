@@ -118,40 +118,18 @@ func NewAnthropic(config core.Config) (*Client, error) {
 
 	baseClient := core.NewClient(config)
 
-	return &Client{
+	client := &Client{
 		BaseClient: baseClient,
-	}, nil
-}
-
-// Chat performs a non-streaming chat completion
-func (c *Client) Chat(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.Response, error) {
-	options := core.ApplyOptions(opts...)
-	messages = core.ProcessAttachments(messages, options.Attachments)
-
-	var response *core.Response
-	err := c.Retry(ctx, func() error {
-		resp, err := c.doChat(ctx, messages, options, false)
-		if err != nil {
-			return err
-		}
-		response = resp
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
 	}
 
-	// Call usage callback if provided
-	if options.UsageCallback != nil && response.Usage != nil {
-		options.UsageCallback(*response.Usage)
-	}
+	client.SetChatFunc(client.doChat)
+	client.SetStreamFunc(client.doChatStream)
 
-	return response, nil
+	return client, nil
 }
 
-// ChatStream performs a streaming chat completion
-func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.Stream, error) {
+// doChatStream performs a streaming chat completion
+func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.Stream, error) {
 	options := core.ApplyOptions(opts...)
 	messages = core.ProcessAttachments(messages, options.Attachments)
 

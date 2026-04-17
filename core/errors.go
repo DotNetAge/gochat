@@ -1,6 +1,9 @@
 package core
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // ErrorType defines the classification of errors that can occur
 // during API operations. Use these types to programmatically handle
@@ -65,6 +68,12 @@ func (e *Error) Error() string {
 		return fmt.Sprintf("%s: %s (cause: %v)", e.Type, e.Message, e.Cause)
 	}
 	return fmt.Sprintf("%s: %s", e.Type, e.Message)
+}
+
+// Unwrap returns the underlying cause of the error, allowing it to work
+// with errors.Is and errors.As from the standard errors package.
+func (e *Error) Unwrap() error {
+	return e.Cause
 }
 
 // NewError creates a new structured error with the specified type,
@@ -152,12 +161,25 @@ func NewUnknownError(message string, cause error) *Error {
 
 // NewAPIErrorFromResponse creates a new API error from HTTP response status and body.
 // This is a convenience method for creating standardized error responses.
-//
-// Parameters:
-//   - statusCode: HTTP status code from the response
-//   - body: Response body bytes
-//
-// Returns an Error with Type set to ErrorTypeAPI
+// It attempts to parse JSON error responses common to AI providers.
 func NewAPIErrorFromResponse(statusCode int, body []byte) *Error {
-	return NewAPIError(fmt.Sprintf("request failed with status %d: %s", statusCode, string(body)), nil)
+	var errData struct {
+		Error struct {
+			Message string `json:"message"`
+			Code    string `json:"code"`
+		} `json:"error"`
+		Message string `json:"message"` // fallback for some providers
+		Code    string `json:"code"`    // fallback for some providers
+	}
+
+	message := string(body)
+	if err := json.Unmarshal(body, &errData); err == nil {
+		if errData.Error.Message != "" {
+			message = errData.Error.Message
+		} else if errData.Message != "" {
+			message = errData.Message
+		}
+	}
+
+	return NewAPIError(fmt.Sprintf("request failed with status %d: %s", statusCode, message), nil)
 }

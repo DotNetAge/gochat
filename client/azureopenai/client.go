@@ -73,37 +73,16 @@ func NewAzureOpenAI(config Config) (*Client, error) {
 
 	baseClient := core.NewClient(config.Config)
 
-	return &Client{
+	client := &Client{
 		BaseClient: baseClient,
 		endpoint:   config.Endpoint,
 		apiVersion: config.APIVersion,
-	}, nil
-}
-
-// Chat performs a non-streaming chat completion
-func (c *Client) Chat(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.Response, error) {
-	options := core.ApplyOptions(opts...)
-	messages = core.ProcessAttachments(messages, options.Attachments)
-
-	var response *core.Response
-	err := c.Retry(ctx, func() error {
-		resp, err := c.doChat(ctx, messages, options, false)
-		if err != nil {
-			return err
-		}
-		response = resp
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
 	}
 
-	if options.UsageCallback != nil && response.Usage != nil {
-		options.UsageCallback(*response.Usage)
-	}
+	client.SetChatFunc(client.doChat)
+	client.SetStreamFunc(client.ChatStream)
 
-	return response, nil
+	return client, nil
 }
 
 // ChatStream performs a streaming chat completion
@@ -111,10 +90,8 @@ func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts .
 	options := core.ApplyOptions(opts...)
 	messages = core.ProcessAttachments(messages, options.Attachments)
 
-	// Build request
-	model := c.ResolveModel(options)
+	// Build request - Azure uses deployment-id in URL, no model field in body
 	reqBody := openai.ChatCompletionRequest{
-		Model:        model,
 		Messages:     openai.MessagesToWire(messages, options.SystemPrompt),
 		Temperature:  c.ResolveTemperature(options),
 		MaxTokens:    c.ResolveMaxTokens(options),
@@ -138,8 +115,9 @@ func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts .
 	}
 
 	// Azure OpenAI uses deployment name in URL
+	deploymentID := c.ResolveModel(options)
 	url := fmt.Sprintf("%s/openai/deployments/%s/chat/completions?api-version=%s",
-		c.endpoint, model, c.apiVersion)
+		c.endpoint, deploymentID, c.apiVersion)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
 	if err != nil {
@@ -184,9 +162,8 @@ func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts .
 
 // doChat performs the actual chat request
 func (c *Client) doChat(ctx context.Context, messages []core.Message, options core.Options, stream bool) (*core.Response, error) {
-	model := c.ResolveModel(options)
+	// Build request - Azure uses deployment-id in URL, no model field in body
 	reqBody := openai.ChatCompletionRequest{
-		Model:        model,
 		Messages:     openai.MessagesToWire(messages, options.SystemPrompt),
 		Temperature:  c.ResolveTemperature(options),
 		MaxTokens:    c.ResolveMaxTokens(options),
@@ -210,8 +187,9 @@ func (c *Client) doChat(ctx context.Context, messages []core.Message, options co
 	}
 
 	// Azure OpenAI uses deployment name in URL
+	deploymentID := c.ResolveModel(options)
 	url := fmt.Sprintf("%s/openai/deployments/%s/chat/completions?api-version=%s",
-		c.endpoint, model, c.apiVersion)
+		c.endpoint, deploymentID, c.apiVersion)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
 	if err != nil {

@@ -45,15 +45,10 @@ func NewDeepSeek(config core.Config) (*Client, error) {
 	}
 
 	// Inject chat and stream functions
-	client.SetChatFunc(client.doChatInternal)
+	client.SetChatFunc(client.doChat)
 	client.SetStreamFunc(client.doChatStream)
 
 	return client, nil
-}
-
-// ChatStream performs a streaming chat completion
-func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts ...core.Option) (*core.Stream, error) {
-	return c.doChatStream(ctx, messages, opts...)
 }
 
 // doChatStream performs the actual streaming chat request
@@ -80,6 +75,11 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 
 	if len(options.Tools) > 0 {
 		reqBody.Tools = openai.ToolsToWire(options.Tools)
+	}
+
+	// Add incremental_output support for DeepSeek
+	if options.IncrementalOutput {
+		reqBody.IncrementalOutput = true
 	}
 
 	jsonData, err := json.Marshal(reqBody)
@@ -134,8 +134,8 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 	return core.NewStream(ch, resp.Body), nil
 }
 
-// doChatInternal performs the actual chat request
-func (c *Client) doChatInternal(ctx context.Context, messages []core.Message, options core.Options, stream bool) (*core.Response, error) {
+// doChat performs the actual chat request
+func (c *Client) doChat(ctx context.Context, messages []core.Message, options core.Options, stream bool) (*core.Response, error) {
 	model := c.BaseClient.ResolveModel(options)
 	reqBody := openai.ChatCompletionRequest{
 		Model:        model,

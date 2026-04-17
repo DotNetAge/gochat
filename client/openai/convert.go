@@ -221,6 +221,7 @@ func StreamChunkToEvent(chunk StreamChunk) core.StreamEvent {
 
 	choice := chunk.Choices[0]
 
+	// Check for finish reason first - this indicates stream completion
 	if choice.FinishReason != "" {
 		return core.StreamEvent{
 			Type: core.EventDone,
@@ -228,12 +229,14 @@ func StreamChunkToEvent(chunk StreamChunk) core.StreamEvent {
 	}
 
 	if choice.Delta != nil {
+		// Handle reasoning content (thinking)
 		if choice.Delta.ReasoningContent != "" {
 			return core.StreamEvent{
 				Type:    core.EventThinking,
 				Content: choice.Delta.ReasoningContent,
 			}
 		}
+		// Handle regular content
 		if choice.Delta.Content != "" {
 			return core.StreamEvent{
 				Type:    core.EventContent,
@@ -242,5 +245,7 @@ func StreamChunkToEvent(chunk StreamChunk) core.StreamEvent {
 		}
 	}
 
+	// If we get here with no content and no finish reason, it's an empty chunk
+	// Return EventContent with empty string to maintain compatibility
 	return core.StreamEvent{Type: core.EventContent}
 }

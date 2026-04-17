@@ -4,16 +4,22 @@ import "encoding/json"
 
 // ChatCompletionRequest represents the OpenAI-compatible chat completion request
 type ChatCompletionRequest struct {
-	Model           string    `json:"model"`
-	Messages        []Message `json:"messages"`
-	Temperature     float64   `json:"temperature,omitempty"`
-	MaxTokens       int       `json:"max_tokens,omitempty"`
-	TopP            float64   `json:"top_p,omitempty"`
-	Stop            []string  `json:"stop,omitempty"`
-	Stream          bool      `json:"stream,omitempty"`
-	ReasoningEffort string    `json:"reasoning_effort,omitempty"` // for OpenAI o1/o3
-	EnableSearch    bool      `json:"enable_search,omitempty"`
-	Tools           []Tool    `json:"tools,omitempty"`
+	Model            string                 `json:"model"`
+	Messages         []Message              `json:"messages"`
+	Temperature      float64                `json:"temperature,omitempty"`
+	MaxTokens        int                    `json:"max_tokens,omitempty"`
+	TopP             float64                `json:"top_p,omitempty"`
+	Stop             []string               `json:"stop,omitempty"`
+	Stream           bool                   `json:"stream,omitempty"`
+	StreamOptions    map[string]interface{} `json:"stream_options,omitempty"`
+	ReasoningEffort  string                 `json:"reasoning_effort,omitempty"` // for OpenAI o1/o3
+	Tools            []Tool                 `json:"tools,omitempty"`
+
+	// Qwen-specific parameters (supported in OpenAI compatibility mode)
+	EnableSearch      bool `json:"enable_search,omitempty"`      // Enable web search
+	EnableThinking    *bool `json:"enable_thinking,omitempty"`    // Enable deep thinking mode (pointer to allow explicit false)
+	ThinkingBudget    int  `json:"thinking_budget,omitempty"`    // Max thinking tokens
+	IncrementalOutput bool `json:"incremental_output,omitempty"` // Stream incremental output
 }
 
 // Message represents a message in the OpenAI wire format
