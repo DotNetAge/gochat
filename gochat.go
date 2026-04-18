@@ -33,8 +33,8 @@ type ClientBuilder interface {
 	ThinkingBudget(budget int) ClientBuilder
 	EnableSearch(search bool) ClientBuilder
 	IncrementalOutput(enabled bool) ClientBuilder // 流式增量输出（DeepSeek, Qwen）
-	Format(format string) ClientBuilder          // 响应格式，如 "json"（Ollama）
-	KeepAlive(duration string) ClientBuilder     // 模型内存保持时长（Ollama）
+	Format(format string) ClientBuilder           // 响应格式，如 "json"（Ollama）
+	KeepAlive(duration string) ClientBuilder      // 模型内存保持时长（Ollama）
 	UsageCallback(fn func(core.Usage)) ClientBuilder
 	Attach(attachments ...core.Attachment) ClientBuilder
 	UserMessage(msg string) ClientBuilder
@@ -43,6 +43,8 @@ type ClientBuilder interface {
 	Tools(tool ...core.Tool) ClientBuilder
 	GetResponse(clientType ClientType) (*core.Response, error)
 	GetStream(clientType ClientType) (*core.Stream, error)
+	Build() (core.Client, error) // 构建并返回客户端（openai)
+	BuildFor(clientType ClientType) (core.Client, error)
 }
 
 // defaultClientBuilder 是 ClientBuilder 接口的默认实现
@@ -219,9 +221,19 @@ func (b *defaultClientBuilder) buildClient(clientType ClientType) (core.Client, 
 	}
 }
 
+// Build 构建并返回默认客户端（OpenAI）
+func (b *defaultClientBuilder) Build() (core.Client, error) {
+	return b.BuildFor(OpenAIClient)
+}
+
+// BuildFor 根据 ClientType 构建并返回对应的客户端
+func (b *defaultClientBuilder) BuildFor(clientType ClientType) (core.Client, error) {
+	return b.buildClient(clientType)
+}
+
 // GetResponse 获取非流式响应
 func (b *defaultClientBuilder) GetResponse(clientType ClientType) (*core.Response, error) {
-	client, err := b.buildClient(clientType)
+	client, err := b.BuildFor(clientType)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +244,7 @@ func (b *defaultClientBuilder) GetResponse(clientType ClientType) (*core.Respons
 
 // GetStream 获取流式响应
 func (b *defaultClientBuilder) GetStream(clientType ClientType) (*core.Stream, error) {
-	client, err := b.buildClient(clientType)
+	client, err := b.BuildFor(clientType)
 	if err != nil {
 		return nil, err
 	}
