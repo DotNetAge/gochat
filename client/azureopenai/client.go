@@ -92,13 +92,17 @@ func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts .
 
 	// Build request - Azure uses deployment-id in URL, no model field in body
 	reqBody := openai.ChatCompletionRequest{
-		Messages:     openai.MessagesToWire(messages, options.SystemPrompt),
-		Temperature:  c.ResolveTemperature(options),
-		MaxTokens:    c.ResolveMaxTokens(options),
-		TopP:         c.ResolveTopP(options),
-		Stop:         options.Stop,
-		Stream:       true,
-		EnableSearch: options.EnableSearch,
+		Messages:    openai.MessagesToWire(messages, options.SystemPrompt),
+		Temperature: c.ResolveTemperature(options),
+		MaxTokens:   c.ResolveMaxTokens(options),
+		TopP:        c.ResolveTopP(options),
+		Stop:        options.Stop,
+		Stream:      true,
+		ExtraBody:   make(map[string]interface{}),
+	}
+
+	if options.EnableSearch {
+		reqBody.ExtraBody["enable_search"] = true
 	}
 
 	if options.Thinking {
@@ -164,13 +168,17 @@ func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts .
 func (c *Client) doChat(ctx context.Context, messages []core.Message, options core.Options, stream bool) (*core.Response, error) {
 	// Build request - Azure uses deployment-id in URL, no model field in body
 	reqBody := openai.ChatCompletionRequest{
-		Messages:     openai.MessagesToWire(messages, options.SystemPrompt),
-		Temperature:  c.ResolveTemperature(options),
-		MaxTokens:    c.ResolveMaxTokens(options),
-		TopP:         c.ResolveTopP(options),
-		Stop:         options.Stop,
-		Stream:       stream,
-		EnableSearch: options.EnableSearch,
+		Messages:    openai.MessagesToWire(messages, options.SystemPrompt),
+		Temperature: c.ResolveTemperature(options),
+		MaxTokens:   c.ResolveMaxTokens(options),
+		TopP:        c.ResolveTopP(options),
+		Stop:        options.Stop,
+		Stream:      stream,
+		ExtraBody:   make(map[string]interface{}),
+	}
+
+	if options.EnableSearch {
+		reqBody.ExtraBody["enable_search"] = true
 	}
 
 	if options.Thinking {

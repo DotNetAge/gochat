@@ -107,7 +107,7 @@ gochat.NewClientBuilder().
     EnableThinking(true).      // Enable thinking mode
     ThinkingBudget(1024).      // Thinking budget
     EnableSearch(true).        // Enable search
-    SysemMessage("You are an assistant"). // System message
+    SystemMessage("You are an assistant"). // System message
     UserMessage("User message").   // User message
     AssistantMessage("Assistant message"). // Assistant message
     AttachFile(attachment).    // Attach file

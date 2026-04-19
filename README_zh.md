@@ -107,7 +107,7 @@ gochat.NewClientBuilder().
     EnableThinking(true).      // 启用思考模式
     ThinkingBudget(1024).      // 思考预算
     EnableSearch(true).        // 启用搜索
-    SysemMessage("你是一个助手"). // 系统消息
+    SystemMessage("你是一个助手"). // 系统消息
     UserMessage("用户消息").    // 用户消息
     AssistantMessage("助手消息"). // 助手消息
     AttachFile(attachment).    // 附加文件

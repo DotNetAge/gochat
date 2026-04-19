@@ -69,24 +69,51 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 	// Build request
 	model := c.BaseClient.ResolveModel(options)
 	reqBody := ChatCompletionRequest{
-		Model:        model,
-		Messages:     MessagesToWire(messages, options.SystemPrompt),
-		Temperature:  c.BaseClient.ResolveTemperature(options),
-		MaxTokens:    c.BaseClient.ResolveMaxTokens(options),
-		TopP:         c.BaseClient.ResolveTopP(options),
-		Stop:         options.Stop,
-		Stream:       true,
-		EnableSearch: options.EnableSearch,
-		ThinkingBudget: options.ThinkingBudget,
-		IncrementalOutput: options.IncrementalOutput,
+		Model:       model,
+		Messages:    MessagesToWire(messages, options.SystemPrompt),
+		Temperature: c.BaseClient.ResolveTemperature(options),
+		MaxTokens:   c.BaseClient.ResolveMaxTokens(options),
+		TopP:        c.BaseClient.ResolveTopP(options),
+		Stop:        options.Stop,
+		Stream:      true,
+		ExtraBody:   make(map[string]interface{}),
 	}
 
-	// Handle EnableThinking - use pointer to allow explicit false value
+	// Qwen-specific parameters MUST be in extra_body
+	if options.EnableSearch {
+		reqBody.ExtraBody["enable_search"] = true
+	}
+	if options.TopK != nil {
+		reqBody.ExtraBody["top_k"] = *options.TopK
+	}
+	if options.IncrementalOutput {
+		reqBody.ExtraBody["incremental_output"] = true
+	}
+	if options.ThinkingBudget > 0 {
+		reqBody.ExtraBody["thinking_budget"] = options.ThinkingBudget
+	}
+
+	// Handle stream options for usage
+	reqBody.StreamOptions = map[string]interface{}{
+		"include_usage": true,
+	}
+
+	// Handle PresencePenalty and ParallelToolCalls (OpenAI standard)
+	reqBody.PresencePenalty = options.PresencePenalty
+	reqBody.FrequencyPenalty = options.FrequencyPenalty
+	reqBody.ParallelToolCalls = options.ParallelToolCalls
+	reqBody.ToolChoice = options.ToolChoice
+
+	// Handle ResponseFormat
+	if options.ResponseFormat != "" {
+		reqBody.ResponseFormat = map[string]string{"type": options.ResponseFormat}
+	}
+
+	// Handle EnableThinking
 	if options.Thinking {
-		reqBody.EnableThinking = &[]bool{true}[0]
+		reqBody.ExtraBody["enable_thinking"] = true
 	} else {
-		// Explicitly set to false to disable thinking mode
-		reqBody.EnableThinking = &[]bool{false}[0]
+		reqBody.ExtraBody["enable_thinking"] = false
 	}
 
 	if len(options.Tools) > 0 {
@@ -162,17 +189,39 @@ func (c *Client) doChat(ctx context.Context, messages []core.Message, options co
 		TopP:             c.BaseClient.ResolveTopP(options),
 		Stop:             options.Stop,
 		Stream:           stream,
-		EnableSearch:     options.EnableSearch,
-		ThinkingBudget:   options.ThinkingBudget,
-		IncrementalOutput: options.IncrementalOutput,
+		ExtraBody:        make(map[string]interface{}),
 	}
 
-	// Handle EnableThinking - use pointer to allow explicit false value
+	// Qwen-specific parameters MUST be in extra_body
+	if options.EnableSearch {
+		reqBody.ExtraBody["enable_search"] = true
+	}
+	if options.TopK != nil {
+		reqBody.ExtraBody["top_k"] = *options.TopK
+	}
+	if options.IncrementalOutput {
+		reqBody.ExtraBody["incremental_output"] = true
+	}
+	if options.ThinkingBudget > 0 {
+		reqBody.ExtraBody["thinking_budget"] = options.ThinkingBudget
+	}
+
+	// Handle PresencePenalty and ParallelToolCalls (OpenAI standard)
+	reqBody.PresencePenalty = options.PresencePenalty
+	reqBody.FrequencyPenalty = options.FrequencyPenalty
+	reqBody.ParallelToolCalls = options.ParallelToolCalls
+	reqBody.ToolChoice = options.ToolChoice
+
+	// Handle ResponseFormat
+	if options.ResponseFormat != "" {
+		reqBody.ResponseFormat = map[string]string{"type": options.ResponseFormat}
+	}
+
+	// Handle EnableThinking
 	if options.Thinking {
-		reqBody.EnableThinking = &[]bool{true}[0]
+		reqBody.ExtraBody["enable_thinking"] = true
 	} else {
-		// Explicitly set to false to disable thinking mode
-		reqBody.EnableThinking = &[]bool{false}[0]
+		reqBody.ExtraBody["enable_thinking"] = false
 	}
 
 	if len(options.Tools) > 0 {

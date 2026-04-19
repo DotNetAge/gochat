@@ -14,12 +14,15 @@ type ChatCompletionRequest struct {
 	StreamOptions    map[string]interface{} `json:"stream_options,omitempty"`
 	ReasoningEffort  string                 `json:"reasoning_effort,omitempty"` // for OpenAI o1/o3
 	Tools            []Tool                 `json:"tools,omitempty"`
+	TopK             *int                   `json:"top_k,omitempty"`
+	PresencePenalty  *float64               `json:"presence_penalty,omitempty"`
+	FrequencyPenalty *float64               `json:"frequency_penalty,omitempty"`
+	ParallelToolCalls *bool                  `json:"parallel_tool_calls,omitempty"`
+	ToolChoice       interface{}            `json:"tool_choice,omitempty"`
+	ResponseFormat   interface{}            `json:"response_format,omitempty"`
 
-	// Qwen-specific parameters (supported in OpenAI compatibility mode)
-	EnableSearch      bool `json:"enable_search,omitempty"`      // Enable web search
-	EnableThinking    *bool `json:"enable_thinking,omitempty"`    // Enable deep thinking mode (pointer to allow explicit false)
-	ThinkingBudget    int  `json:"thinking_budget,omitempty"`    // Max thinking tokens
-	IncrementalOutput bool `json:"incremental_output,omitempty"` // Stream incremental output
+	// ExtraBody for provider-specific parameters (e.g., Qwen)
+	ExtraBody map[string]interface{} `json:"extra_body,omitempty"`
 }
 
 // Message represents a message in the OpenAI wire format
@@ -85,9 +88,23 @@ type Choice struct {
 
 // Usage represents token usage
 type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
+	PromptTokens            int                      `json:"prompt_tokens"`
+	CompletionTokens        int                      `json:"completion_tokens"`
+	TotalTokens             int                      `json:"total_tokens"`
+	PromptTokensDetails     *PromptTokensDetails     `json:"prompt_tokens_details,omitempty"`
+	CompletionTokensDetails *CompletionTokensDetails `json:"completion_tokens_details,omitempty"`
+}
+
+// PromptTokensDetails contains details about prompt tokens
+type PromptTokensDetails struct {
+	CachedTokens int `json:"cached_tokens,omitempty"`
+}
+
+// CompletionTokensDetails contains details about completion tokens
+type CompletionTokensDetails struct {
+	ReasoningTokens          int `json:"reasoning_tokens,omitempty"`
+	AcceptedPredictionTokens int `json:"accepted_prediction_tokens,omitempty"`
+	RejectedPredictionTokens int `json:"rejected_prediction_tokens,omitempty"`
 }
 
 // StreamChunk represents a chunk in the streaming response

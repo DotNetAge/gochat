@@ -7,6 +7,10 @@ const (
 	// Example: "You are a helpful coding assistant."
 	RoleSystem = "system"
 
+	// RoleDeveloper is for developer instructions (OpenAI o1/o3 specific).
+	// It's a modern replacement for RoleSystem in newer OpenAI models.
+	RoleDeveloper = "developer"
+
 	// RoleUser is for messages from the human user.
 	// These are the questions or prompts you send to the model.
 	RoleUser = "user"
@@ -105,6 +109,11 @@ func NewUserMessage(text string) Message {
 // NewSystemMessage creates a system message
 func NewSystemMessage(text string) Message {
 	return NewTextMessage(RoleSystem, text)
+}
+
+// NewDeveloperMessage creates a developer message (OpenAI specific)
+func NewDeveloperMessage(text string) Message {
+	return NewTextMessage(RoleDeveloper, text)
 }
 
 // TextContent returns the concatenated text of all text blocks.

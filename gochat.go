@@ -2,6 +2,7 @@ package gochat
 
 import (
 	"context"
+	"time"
 
 	"github.com/DotNetAge/gochat/client/anthropic"
 	"github.com/DotNetAge/gochat/client/azureopenai"
@@ -10,6 +11,39 @@ import (
 	"github.com/DotNetAge/gochat/client/openai"
 	"github.com/DotNetAge/gochat/core"
 )
+
+// Option defines the configuration options for ClientBuilder
+type Option func(*core.Config)
+
+// WithAPIKey sets the API key
+func WithAPIKey(key string) Option {
+	return func(c *core.Config) { c.APIKey = key }
+}
+
+// WithAuthToken sets the auth token
+func WithAuthToken(token string) Option {
+	return func(c *core.Config) { c.AuthToken = token }
+}
+
+// WithBaseURL sets the base URL
+func WithBaseURL(url string) Option {
+	return func(c *core.Config) { c.BaseURL = url }
+}
+
+// WithModel sets the model name
+func WithModel(model string) Option {
+	return func(c *core.Config) { c.Model = model }
+}
+
+// WithTimeout sets the request timeout
+func WithTimeout(timeout time.Duration) Option {
+	return func(c *core.Config) { c.Timeout = timeout }
+}
+
+// WithMaxRetries sets the maximum number of retries
+func WithMaxRetries(retries int) Option {
+	return func(c *core.Config) { c.MaxRetries = retries }
+}
 
 type ClientType int
 
@@ -23,26 +57,36 @@ const (
 )
 
 type ClientBuilder interface {
-	Init(config core.Config) ClientBuilder
-	Temperature(temp float64) ClientBuilder
-	Model(model string) ClientBuilder
-	MaxTokens(max int) ClientBuilder
-	Stop(stop ...string) ClientBuilder
-	TopP(top float64) ClientBuilder
-	EnableThinking(think bool) ClientBuilder
+	Config(opts ...Option) ClientBuilder            // 用Option去设置 core.config
+	Messages(messages ...core.Message) ClientBuilder // 批量设置消息
+	Temperature(temp float64) ClientBuilder          // 采样温度，控制模型生成文本的多样性。temperature越高，生成的文本更多样，反之，生成的文本更确定。
+	Model(model string) ClientBuilder                // 用于指定模型名称
+	MaxTokens(max int) ClientBuilder                 // 用于限制模型输出的最大 Token 数。若生成内容超过此值，生成将提前停止，且返回的finish_reason为length。
+	Stop(stop ...string) ClientBuilder               // 用于指定停止词。当模型生成的文本中出现stop 指定的字符串或token_id时，生成将立即终止。
+	TopP(top float64) ClientBuilder                  // 核采样的概率阈值，控制模型生成文本的多样性。
+	TopK(top int) ClientBuilder                      // 指定生成过程中用于采样的候选 Token 数量。值越大，输出越随机；值越小，输出越确定。若设为 null 或大于 100，则禁用 top_k 策略，仅 top_p 策略生效。取值必须为大于或等于 0 的整数。
+	EnableThinking(think bool) ClientBuilder         // 启用扩展思考/推理功能
 	ThinkingBudget(budget int) ClientBuilder
-	EnableSearch(search bool) ClientBuilder
-	IncrementalOutput(enabled bool) ClientBuilder // 流式增量输出（DeepSeek, Qwen）
-	Format(format string) ClientBuilder           // 响应格式，如 "json"（Ollama）
-	KeepAlive(duration string) ClientBuilder      // 模型内存保持时长（Ollama）
-	UsageCallback(fn func(core.Usage)) ClientBuilder
+	EnableSearch(search bool) ClientBuilder          // 启用搜索功能
+	IncrementalOutput(enabled bool) ClientBuilder    // 流式增量输出（DeepSeek, Qwen）
+	Format(format string) ClientBuilder              // 响应格式，如 "json"（Ollama）
+	KeepAlive(duration string) ClientBuilder         // 模型内存保持时长（Ollama）
+	UsageCallback(fn func(core.Usage)) ClientBuilder // 获取用量的返回值
 	Attach(attachments ...core.Attachment) ClientBuilder
 	UserMessage(msg string) ClientBuilder
-	SysemMessage(msg string) ClientBuilder
+	SystemMessage(msg string) ClientBuilder    // 独立设置系统消息
+	DeveloperMessage(msg string) ClientBuilder // 独立设置开发者消息 (OpenAI o1/o3)
 	AssistantMessage(msg string) ClientBuilder
 	Tools(tool ...core.Tool) ClientBuilder
-	GetResponse(clientType ClientType) (*core.Response, error)
-	GetStream(clientType ClientType) (*core.Stream, error)
+	ToolChoice(choice interface{}) ClientBuilder  // 设置工具选择策略，支持 string (如 "auto") 或具体对象
+	ParallelToolCalls(parallel bool) ClientBuilder // 是否开启并行工具调用
+	PresencePenalty(penalty float64) ClientBuilder
+	FrequencyPenalty(penalty float64) ClientBuilder // 频率惩罚
+	ResponseFormat(format string) ClientBuilder     // 设置响应格式， "json" / "text"
+	GetResponse() (*core.Response, error)           // 获取默认（OpenAI）的响应
+	GetResponseFor(clientType ClientType) (*core.Response, error)
+	GetStream() (*core.Stream, error) // 获取默认（OpenAI）的流
+	GetStreamFor(clientType ClientType) (*core.Stream, error)
 	Build() (core.Client, error) // 构建并返回客户端（openai)
 	BuildFor(clientType ClientType) (core.Client, error)
 }
@@ -68,9 +112,17 @@ func Client() ClientBuilder {
 	}
 }
 
-// Init 初始化客户端配置
-func (b *defaultClientBuilder) Init(config core.Config) ClientBuilder {
-	b.config = config
+// Config 初始化客户端配置
+func (b *defaultClientBuilder) Config(opts ...Option) ClientBuilder {
+	for _, opt := range opts {
+		opt(&b.config)
+	}
+	return b
+}
+
+// Messages 批量设置消息
+func (b *defaultClientBuilder) Messages(messages ...core.Message) ClientBuilder {
+	b.messages = append(b.messages, messages...)
 	return b
 }
 
@@ -101,6 +153,12 @@ func (b *defaultClientBuilder) Stop(stop ...string) ClientBuilder {
 // TopP 设置 top-p 采样参数
 func (b *defaultClientBuilder) TopP(top float64) ClientBuilder {
 	b.options = append(b.options, core.WithTopP(top))
+	return b
+}
+
+// TopK 设置 top-k 采样参数
+func (b *defaultClientBuilder) TopK(top int) ClientBuilder {
+	b.options = append(b.options, core.WithTopK(top))
 	return b
 }
 
@@ -148,7 +206,7 @@ func (b *defaultClientBuilder) UsageCallback(fn func(core.Usage)) ClientBuilder 
 	return b
 }
 
-// AttachFile 附加文件
+// Attach 附加文件
 func (b *defaultClientBuilder) Attach(attachments ...core.Attachment) ClientBuilder {
 	b.options = append(b.options, core.WithAttachments(attachments...))
 	return b
@@ -160,9 +218,15 @@ func (b *defaultClientBuilder) UserMessage(msg string) ClientBuilder {
 	return b
 }
 
-// SysemMessage 添加系统消息（注意：接口中拼写为 SysemMessage）
-func (b *defaultClientBuilder) SysemMessage(msg string) ClientBuilder {
+// SystemMessage 添加系统消息
+func (b *defaultClientBuilder) SystemMessage(msg string) ClientBuilder {
 	b.messages = append(b.messages, core.NewSystemMessage(msg))
+	return b
+}
+
+// DeveloperMessage 添加开发者消息
+func (b *defaultClientBuilder) DeveloperMessage(msg string) ClientBuilder {
+	b.messages = append(b.messages, core.NewDeveloperMessage(msg))
 	return b
 }
 
@@ -176,6 +240,36 @@ func (b *defaultClientBuilder) AssistantMessage(msg string) ClientBuilder {
 func (b *defaultClientBuilder) Tools(tool ...core.Tool) ClientBuilder {
 	b.tools = append(b.tools, tool...)
 	b.options = append(b.options, core.WithTools(tool...))
+	return b
+}
+
+// ToolChoice 设置工具选择策略
+func (b *defaultClientBuilder) ToolChoice(choice interface{}) ClientBuilder {
+	b.options = append(b.options, core.WithToolChoice(choice))
+	return b
+}
+
+// ParallelToolCalls 设置是否开启并行工具调用
+func (b *defaultClientBuilder) ParallelToolCalls(parallel bool) ClientBuilder {
+	b.options = append(b.options, core.WithParallelToolCalls(parallel))
+	return b
+}
+
+// PresencePenalty 设置 presence penalty
+func (b *defaultClientBuilder) PresencePenalty(penalty float64) ClientBuilder {
+	b.options = append(b.options, core.WithPresencePenalty(penalty))
+	return b
+}
+
+// FrequencyPenalty 设置频率惩罚
+func (b *defaultClientBuilder) FrequencyPenalty(penalty float64) ClientBuilder {
+	b.options = append(b.options, core.WithFrequencyPenalty(penalty))
+	return b
+}
+
+// ResponseFormat 设置响应格式
+func (b *defaultClientBuilder) ResponseFormat(format string) ClientBuilder {
+	b.options = append(b.options, core.WithResponseFormat(format))
 	return b
 }
 
@@ -231,8 +325,13 @@ func (b *defaultClientBuilder) BuildFor(clientType ClientType) (core.Client, err
 	return b.buildClient(clientType)
 }
 
-// GetResponse 获取非流式响应
-func (b *defaultClientBuilder) GetResponse(clientType ClientType) (*core.Response, error) {
+// GetResponse 获取默认（OpenAI）的非流式响应
+func (b *defaultClientBuilder) GetResponse() (*core.Response, error) {
+	return b.GetResponseFor(OpenAIClient)
+}
+
+// GetResponseFor 获取指定客户端的非流式响应
+func (b *defaultClientBuilder) GetResponseFor(clientType ClientType) (*core.Response, error) {
 	client, err := b.BuildFor(clientType)
 	if err != nil {
 		return nil, err
@@ -242,8 +341,13 @@ func (b *defaultClientBuilder) GetResponse(clientType ClientType) (*core.Respons
 	return client.Chat(ctx, b.messages, b.options...)
 }
 
-// GetStream 获取流式响应
-func (b *defaultClientBuilder) GetStream(clientType ClientType) (*core.Stream, error) {
+// GetStream 获取默认（OpenAI）的流式响应
+func (b *defaultClientBuilder) GetStream() (*core.Stream, error) {
+	return b.GetStreamFor(OpenAIClient)
+}
+
+// GetStreamFor 获取指定客户端的流式响应
+func (b *defaultClientBuilder) GetStreamFor(clientType ClientType) (*core.Stream, error) {
 	client, err := b.BuildFor(clientType)
 	if err != nil {
 		return nil, err

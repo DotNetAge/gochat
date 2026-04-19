@@ -14,9 +14,15 @@ type Options struct {
 	EnableSearch     bool   // Qwen/compatible-mode search
 	IncrementalOutput bool   // stream incremental output (DeepSeek, Qwen)
 	Format           string // response format, e.g., "json" (Ollama)
-	KeepAlive        string // keep model in memory duration, e.g., "5m" (Ollama)
-	UsageCallback    func(Usage)
-	Attachments      []Attachment
+	KeepAlive         string // keep model in memory duration, e.g., "5m" (Ollama)
+	UsageCallback     func(Usage)
+	Attachments       []Attachment
+	TopK              *int
+	PresencePenalty   *float64
+	FrequencyPenalty  *float64
+	ParallelToolCalls *bool
+	ToolChoice        interface{}
+	ResponseFormat    string
 }
 
 // Option is a functional option for Chat/ChatStream
@@ -103,6 +109,36 @@ func WithAttachments(attachments ...Attachment) Option {
 // WithUsageCallback sets a callback to be called when usage info is available
 func WithUsageCallback(fn func(Usage)) Option {
 	return func(o *Options) { o.UsageCallback = fn }
+}
+
+// WithTopK sets the top-k sampling parameter
+func WithTopK(k int) Option {
+	return func(o *Options) { o.TopK = &k }
+}
+
+// WithPresencePenalty sets the presence penalty parameter
+func WithPresencePenalty(p float64) Option {
+	return func(o *Options) { o.PresencePenalty = &p }
+}
+
+// WithFrequencyPenalty sets the frequency penalty parameter
+func WithFrequencyPenalty(p float64) Option {
+	return func(o *Options) { o.FrequencyPenalty = &p }
+}
+
+// WithParallelToolCalls sets whether to allow parallel tool calls
+func WithParallelToolCalls(parallel bool) Option {
+	return func(o *Options) { o.ParallelToolCalls = &parallel }
+}
+
+// WithToolChoice sets the tool choice parameter
+func WithToolChoice(choice interface{}) Option {
+	return func(o *Options) { o.ToolChoice = choice }
+}
+
+// WithResponseFormat sets the response format (e.g., "json" or "text")
+func WithResponseFormat(format string) Option {
+	return func(o *Options) { o.ResponseFormat = format }
 }
 
 // ApplyOptions builds Options from a list of Option funcs

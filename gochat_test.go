@@ -29,17 +29,15 @@ func TestMaxTokens(t *testing.T) {
 	skipIfNoAPIKey(t)
 	
 	builder := Client().
-		Init(core.Config{
-			APIKey: testAPIKey,
-			Model:  testModel,
-		}).
+		Config(WithAPIKey(testAPIKey), WithModel(testModel)).
 		MaxTokens(50).
 		EnableThinking(false). // 关闭思考模式，否则 max_tokens 不限制思考过程长度
 		UserMessage("请详细介绍一下 Go 语言的历史、特性和应用场景")
 
-	resp, err := builder.GetResponse(QwenClient)
+	resp, err := builder.GetResponseFor(QwenClient)
 	if err != nil {
 		t.Fatalf("请求失败: %v", err)
+
 	}
 
 	t.Logf("响应内容: %s", resp.Content)
@@ -57,17 +55,15 @@ func TestStopSequences(t *testing.T) {
 	skipIfNoAPIKey(t)
 	
 	builder := Client().
-		Init(core.Config{
-			APIKey: testAPIKey,
-			Model:  testModel,
-		}).
+		Config(WithAPIKey(testAPIKey), WithModel(testModel)).
 		MaxTokens(200).
 		Stop("。", "！").
 		UserMessage("请列举 5 种编程语言")
 
-	resp, err := builder.GetResponse(QwenClient)
+	resp, err := builder.GetResponseFor(QwenClient)
 	if err != nil {
 		t.Fatalf("请求失败: %v", err)
+
 	}
 
 	t.Logf("响应内容: %s", resp.Content)
@@ -86,10 +82,7 @@ func TestUsageStatistics(t *testing.T) {
 	var receivedUsage *core.Usage
 
 	builder := Client().
-		Init(core.Config{
-			APIKey: testAPIKey,
-			Model:  testModel,
-		}).
+		Config(WithAPIKey(testAPIKey), WithModel(testModel)).
 		UsageCallback(func(u core.Usage) {
 			receivedUsage = &u
 			t.Logf("用量回调: Prompt=%d, Completion=%d, Total=%d",
@@ -97,9 +90,10 @@ func TestUsageStatistics(t *testing.T) {
 		}).
 		UserMessage("你好")
 
-	resp, err := builder.GetResponse(QwenClient)
+	resp, err := builder.GetResponseFor(QwenClient)
 	if err != nil {
 		t.Fatalf("请求失败: %v", err)
+
 	}
 
 	// 验证响应中的用量统计
@@ -124,18 +118,16 @@ func TestMultiTurnConversation(t *testing.T) {
 	skipIfNoAPIKey(t)
 	
 	builder := Client().
-		Init(core.Config{
-			APIKey: testAPIKey,
-			Model:  testModel,
-		}).
-		SysemMessage("你是一个专业的 Go 语言教学助手，回答要简洁明了").
+		Config(WithAPIKey(testAPIKey), WithModel(testModel)).
+		SystemMessage("你是一个专业的 Go 语言教学助手，回答要简洁明了").
 		UserMessage("什么是 Goroutine？").
 		AssistantMessage("Goroutine 是 Go 语言中的轻量级线程，由 Go 运行时管理。").
 		UserMessage("那 Channel 呢？")
 
-	resp, err := builder.GetResponse(QwenClient)
+	resp, err := builder.GetResponseFor(QwenClient)
 	if err != nil {
 		t.Fatalf("请求失败: %v", err)
+
 	}
 
 	t.Logf("多轮对话响应: %s", resp.Content)
@@ -167,16 +159,14 @@ func TestToolCalling(t *testing.T) {
 	}
 
 	builder := Client().
-		Init(core.Config{
-			APIKey: testAPIKey,
-			Model:  testModel,
-		}).
+		Config(WithAPIKey(testAPIKey), WithModel(testModel)).
 		Tools(weatherTool).
 		UserMessage("北京今天的天气怎么样？")
 
-	resp, err := builder.GetResponse(QwenClient)
+	resp, err := builder.GetResponseFor(QwenClient)
 	if err != nil {
 		t.Fatalf("请求失败: %v", err)
+
 	}
 
 	// 验证是否有工具调用
@@ -198,17 +188,15 @@ func TestThinkingMode(t *testing.T) {
 	skipIfNoAPIKey(t)
 	
 	builder := Client().
-		Init(core.Config{
-			APIKey: testAPIKey,
-			Model:  testModel,
-		}).
+		Config(WithAPIKey(testAPIKey), WithModel(testModel)).
 		EnableThinking(true).
 		ThinkingBudget(512).
 		UserMessage("请解释一下为什么 Go 语言的并发模型比线程更高效？")
 
-	resp, err := builder.GetResponse(QwenClient)
+	resp, err := builder.GetResponseFor(QwenClient)
 	if err != nil {
 		t.Fatalf("请求失败: %v", err)
+
 	}
 
 	t.Logf("思考模式响应: %s", resp.Content)
@@ -226,16 +214,14 @@ func TestWebSearch(t *testing.T) {
 	skipIfNoAPIKey(t)
 	
 	builder := Client().
-		Init(core.Config{
-			APIKey: testAPIKey,
-			Model:  testModel,
-		}).
+		Config(WithAPIKey(testAPIKey), WithModel(testModel)).
 		EnableSearch(true).
 		UserMessage("2024年 Go 语言的最新版本是什么？有哪些新特性？")
 
-	resp, err := builder.GetResponse(QwenClient)
+	resp, err := builder.GetResponseFor(QwenClient)
 	if err != nil {
 		t.Fatalf("请求失败: %v", err)
+
 	}
 
 	t.Logf("网络搜索响应: %s", resp.Content)
@@ -267,16 +253,14 @@ func TestFileAttachment(t *testing.T) {
 	}
 
 	builder := Client().
-		Init(core.Config{
-			APIKey: testAPIKey,
-			Model:  testModel,
-		}).
+		Config(WithAPIKey(testAPIKey), WithModel(testModel)).
 		Attach(attachment).
 		UserMessage("请简要总结这个项目的核心功能和特点")
 
-	resp, err := builder.GetResponse(QwenClient)
+	resp, err := builder.GetResponseFor(QwenClient)
 	if err != nil {
 		t.Fatalf("请求失败: %v", err)
+
 	}
 
 	t.Logf("文件理解响应: %s", resp.Content)
@@ -308,18 +292,16 @@ func TestStreamingOutput(t *testing.T) {
 	skipIfNoAPIKey(t)
 	
 	builder := Client().
-		Init(core.Config{
-			APIKey: testAPIKey,
-			Model:  testModel,
-		}).
+		Config(WithAPIKey(testAPIKey), WithModel(testModel)).
 		EnableThinking(false). // 关闭思考模式以避免超长响应
 		MaxTokens(100).        // 限制生成长度
 		IncrementalOutput(true).
 		UserMessage("请写一首关于程序员的短诗")
 
-	stream, err := builder.GetStream(QwenClient)
+	stream, err := builder.GetStreamFor(QwenClient)
 	if err != nil {
 		t.Fatalf("请求失败: %v", err)
+
 	}
 	defer stream.Close()
 
@@ -374,11 +356,8 @@ func TestAllFeaturesIntegration(t *testing.T) {
 	readmeData, _ := os.ReadFile("README.md")
 
 	builder := Client().
-		Init(core.Config{
-			APIKey: testAPIKey,
-			Model:  testModel,
-		}).
-		SysemMessage("你是一个专业的技术文档分析助手").
+		Config(WithAPIKey(testAPIKey), WithModel(testModel)).
+		SystemMessage("你是一个专业的技术文档分析助手").
 		MaxTokens(300).
 		Attach(core.Attachment{
 			MediaType: "text/markdown",
@@ -387,9 +366,10 @@ func TestAllFeaturesIntegration(t *testing.T) {
 		}).
 		UserMessage("根据文档，GoChat 项目的三个核心模块分别是什么？")
 
-	resp, err := builder.GetResponse(QwenClient)
+	resp, err := builder.GetResponseFor(QwenClient)
 	if err != nil {
 		t.Fatalf("请求失败: %v", err)
+
 	}
 
 	t.Logf("综合测试响应: %s", resp.Content)

@@ -59,14 +59,19 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 	// Build request
 	model := c.BaseClient.ResolveModel(options)
 	reqBody := openai.ChatCompletionRequest{
-		Model:        model,
-		Messages:     openai.MessagesToWire(messages, options.SystemPrompt),
-		Temperature:  c.BaseClient.ResolveTemperature(options),
-		MaxTokens:    c.BaseClient.ResolveMaxTokens(options),
-		TopP:         c.BaseClient.ResolveTopP(options),
-		Stop:         options.Stop,
-		Stream:       true,
-		EnableSearch: options.EnableSearch,
+		Model:       model,
+		Messages:    openai.MessagesToWire(messages, options.SystemPrompt),
+		Temperature: c.BaseClient.ResolveTemperature(options),
+		MaxTokens:   c.BaseClient.ResolveMaxTokens(options),
+		TopP:        c.BaseClient.ResolveTopP(options),
+		Stop:        options.Stop,
+		Stream:      true,
+		ExtraBody:   make(map[string]interface{}),
+	}
+
+	// DeepSeek-specific parameters MUST be in extra_body
+	if options.EnableSearch {
+		reqBody.ExtraBody["enable_search"] = true
 	}
 
 	if options.Thinking {
@@ -79,7 +84,7 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 
 	// Add incremental_output support for DeepSeek
 	if options.IncrementalOutput {
-		reqBody.IncrementalOutput = true
+		reqBody.ExtraBody["incremental_output"] = true
 	}
 
 	jsonData, err := json.Marshal(reqBody)
@@ -138,14 +143,18 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 func (c *Client) doChat(ctx context.Context, messages []core.Message, options core.Options, stream bool) (*core.Response, error) {
 	model := c.BaseClient.ResolveModel(options)
 	reqBody := openai.ChatCompletionRequest{
-		Model:        model,
-		Messages:     openai.MessagesToWire(messages, options.SystemPrompt),
-		Temperature:  c.BaseClient.ResolveTemperature(options),
-		MaxTokens:    c.BaseClient.ResolveMaxTokens(options),
-		TopP:         c.BaseClient.ResolveTopP(options),
-		Stop:         options.Stop,
-		Stream:       stream,
-		EnableSearch: options.EnableSearch,
+		Model:       model,
+		Messages:    openai.MessagesToWire(messages, options.SystemPrompt),
+		Temperature: c.BaseClient.ResolveTemperature(options),
+		MaxTokens:   c.BaseClient.ResolveMaxTokens(options),
+		TopP:        c.BaseClient.ResolveTopP(options),
+		Stop:        options.Stop,
+		Stream:      stream,
+		ExtraBody:   make(map[string]interface{}),
+	}
+
+	if options.EnableSearch {
+		reqBody.ExtraBody["enable_search"] = true
 	}
 
 	if options.Thinking {
