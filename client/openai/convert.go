@@ -71,8 +71,8 @@ func MessagesToWire(messages []core.Message, systemPrompt string) []Message {
 					ID:   tc.ID,
 					Type: "function",
 					Function: struct {
-						Name      string `json:"name"`
-						Arguments string `json:"arguments"`
+						Name      string `json:"name,omitempty"`
+						Arguments string `json:"arguments,omitempty"`
 					}{
 						Name:      tc.Name,
 						Arguments: tc.Arguments,
@@ -221,14 +221,39 @@ func StreamChunkToEvent(chunk StreamChunk) core.StreamEvent {
 
 	choice := chunk.Choices[0]
 
-	// Check for finish reason first - this indicates stream completion
+	// Check for finish reason first — this indicates stream completion
 	if choice.FinishReason != "" {
 		return core.StreamEvent{
-			Type: core.EventDone,
+			Type:          core.EventDone,
+			FinishReason:  choice.FinishReason,
 		}
 	}
 
 	if choice.Delta != nil {
+		// Handle tool call deltas — these arrive incrementally across multiple chunks.
+		// Each delta has an Index field identifying which tool call it belongs to.
+		// Multiple deltas can share the same Index (arguments arrive in fragments).
+		if len(choice.Delta.ToolCalls) > 0 {
+			deltas := make([]core.ToolCallDelta, len(choice.Delta.ToolCalls))
+			for i, tc := range choice.Delta.ToolCalls {
+				idx := i // fallback to array index
+				if tc.Index != nil {
+					idx = *tc.Index
+				}
+				deltas[i] = core.ToolCallDelta{
+					Index:     idx,
+					ID:        tc.ID,
+					Type:      tc.Type,
+					Name:      tc.Function.Name,
+					Arguments: tc.Function.Arguments,
+				}
+			}
+			return core.StreamEvent{
+				Type:           core.EventToolCall,
+				ToolCallDeltas: deltas,
+			}
+		}
+
 		// Handle reasoning content (thinking)
 		if choice.Delta.ReasoningContent != "" {
 			return core.StreamEvent{

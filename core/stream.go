@@ -8,6 +8,19 @@ import (
 	"time"
 )
 
+// ToolCallDelta represents an incremental tool call delta received during
+// streaming. Tool calls arrive incrementally across multiple chunks; each
+// chunk carries a delta for one or more tool calls identified by Index.
+// The ID and Name are only set in the first delta chunk for each index;
+// subsequent deltas accumulate Arguments incrementally.
+type ToolCallDelta struct {
+	Index     int    `json:"index"`
+	ID        string `json:"id,omitempty"`
+	Type      string `json:"type,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Arguments string `json:"arguments,omitempty"`
+}
+
 // streamCloseTimeout is the maximum time Close() will wait for the
 // stream channel to drain before giving up.
 const streamCloseTimeout = 5 * time.Second
@@ -26,6 +39,11 @@ const (
 	// This is used by models that support extended thinking.
 	EventThinking StreamEventType = "thinking"
 
+	// EventToolCall indicates an incremental tool call delta was received.
+	// Tool calls arrive across multiple chunks and must be accumulated by
+	// the Stream consumer. The ToolCallDeltas field carries the delta data.
+	EventToolCall StreamEventType = "tool_call"
+
 	// EventDone indicates the stream has completed successfully.
 	// This signals that all data has been received.
 	EventDone StreamEventType = "done"
@@ -38,12 +56,21 @@ const (
 // StreamEvent represents a single unit of data received during streaming.
 // Events are sent through a channel as they arrive from the server.
 type StreamEvent struct {
-	// Type indicates what kind of event this is (content, thinking, done, error).
+	// Type indicates what kind of event this is (content, thinking, tool_call, done, error).
 	Type StreamEventType
 
 	// Content contains the text data for content or thinking events.
 	// This is empty for done or error events.
 	Content string
+
+	// ToolCallDeltas contains incremental tool call data for tool_call events.
+	// Tool calls arrive incrementally across multiple chunks and must be
+	// accumulated by index to reconstruct the complete tool call.
+	ToolCallDeltas []ToolCallDelta
+
+	// FinishReason indicates why the model stopped generating.
+	// Set on EventDone: "stop", "tool_calls", "length", "content_filter".
+	FinishReason string
 
 	// Usage contains token usage statistics when available.
 	// This is typically populated when the stream completes.
@@ -52,6 +79,14 @@ type StreamEvent struct {
 	// Err is non-nil if an error occurred during streaming.
 	// When this is set, the stream has terminated abnormally.
 	Err error
+}
+
+// streamToolCallState tracks the accumulation of a single tool call
+// across multiple streaming delta chunks.
+type streamToolCallState struct {
+	id        string
+	name      string
+	arguments strings.Builder
 }
 
 // Stream provides a thread-safe interface for consuming streaming responses.
@@ -74,6 +109,10 @@ type Stream struct {
 	mu       sync.Mutex
 	doneCh   chan struct{}
 	once     sync.Once
+
+	// Tool call accumulation state
+	toolCallAcc   map[int]*streamToolCallState // accumulation state by delta index
+	toolCalls     []ToolCall                   // final accumulated tool calls
 }
 
 // NewStream creates a new Stream wrapping the provided event channel.
@@ -97,6 +136,65 @@ func NewStream(ch <-chan StreamEvent, closer io.Closer) *Stream {
 		})
 	}
 	return s
+}
+
+// initToolCallAcc lazily initializes the tool call accumulator.
+func (s *Stream) initToolCallAcc() {
+	if s.toolCallAcc == nil {
+		s.toolCallAcc = make(map[int]*streamToolCallState)
+	}
+}
+
+// accumulateToolCalls processes ToolCallDeltas from an event, merging
+// incremental arguments into the ongoing accumulator by delta index.
+func (s *Stream) accumulateToolCalls(deltas []ToolCallDelta) {
+	s.initToolCallAcc()
+	for _, d := range deltas {
+		state, ok := s.toolCallAcc[d.Index]
+		if !ok {
+			state = &streamToolCallState{}
+			s.toolCallAcc[d.Index] = state
+		}
+		if d.ID != "" {
+			state.id = d.ID
+		}
+		if d.Name != "" {
+			state.name = d.Name
+		}
+		if d.Arguments != "" {
+			state.arguments.WriteString(d.Arguments)
+		}
+	}
+}
+
+// finalizeToolCalls converts the accumulated tool call states into final
+// ToolCall slices. This is called when the stream ends (EventDone).
+func (s *Stream) finalizeToolCalls() {
+	if len(s.toolCallAcc) == 0 {
+		s.toolCalls = nil
+		return
+	}
+	// Collect by index order for deterministic output
+	maxIdx := 0
+	for idx := range s.toolCallAcc {
+		if idx > maxIdx {
+			maxIdx = idx
+		}
+	}
+	result := make([]ToolCall, 0, maxIdx+1)
+	for i := 0; i <= maxIdx; i++ {
+		state, ok := s.toolCallAcc[i]
+		if !ok {
+			continue
+		}
+		result = append(result, ToolCall{
+			ID:        state.id,
+			Name:      state.name,
+			Arguments: state.arguments.String(),
+		})
+	}
+	s.toolCalls = result
+	s.toolCallAcc = nil // release memory
 }
 
 // Next advances the stream to the next event. Returns false if the
@@ -123,6 +221,7 @@ func (s *Stream) Next() bool {
 		if !ok {
 			s.done = true
 			s.autoClose()
+			s.finalizeToolCalls()
 			return false
 		}
 		s.current = ev
@@ -133,7 +232,18 @@ func (s *Stream) Next() bool {
 		if ev.Usage != nil {
 			s.usage = ev.Usage
 		}
+		if ev.Type == EventToolCall {
+			s.accumulateToolCalls(ev.ToolCallDeltas)
+		}
 		if ev.Type == EventDone {
+			// On streaming tool calls, the final chunk has finish_reason="tool_calls"
+			// but the delta is empty — the actual tool call data came in prior chunks.
+			// finalizeToolCalls merges all accumulated deltas into final ToolCall objects.
+			s.finalizeToolCalls()
+			// Capture finish reason for consumer inspection
+			if ev.FinishReason != "" {
+				s.current = ev
+			}
 			s.done = true
 			s.closeInternal()
 		}
@@ -235,6 +345,20 @@ func (s *Stream) Usage() *Usage {
 	return s.usage
 }
 
+// ToolCalls returns the accumulated tool calls from the streaming response.
+// Tool calls are accumulated from EventToolCall deltas during Next() iteration
+// and finalized when EventDone is received (finish_reason="tool_calls").
+//
+// The returned slice is nil if no tool calls were made by the model.
+// Results are ordered by the delta index from the streaming response.
+//
+// Returns the accumulated ToolCall slice
+func (s *Stream) ToolCalls() []ToolCall {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.toolCalls
+}
+
 // Text collects and returns all content events as a single string.
 // This is a convenience method for when you only care about the
 // text output and not the individual events.
@@ -272,8 +396,16 @@ func (s *Stream) Text() (string, error) {
 			if ev.Usage != nil {
 				s.usage = ev.Usage
 			}
-			if ev.Type == EventContent {
+			switch ev.Type {
+			case EventContent:
 				buf.WriteString(ev.Content)
+			case EventToolCall:
+				s.accumulateToolCalls(ev.ToolCallDeltas)
+			case EventDone:
+				s.finalizeToolCalls()
+				s.done = true
+				s.mu.Unlock()
+				goto checkError
 			}
 			s.mu.Unlock()
 		}
@@ -322,8 +454,16 @@ func (s *Stream) ReasoningText() (string, error) {
 			if ev.Usage != nil {
 				s.usage = ev.Usage
 			}
-			if ev.Type == EventThinking {
+			switch ev.Type {
+			case EventThinking:
 				buf.WriteString(ev.Content)
+			case EventToolCall:
+				s.accumulateToolCalls(ev.ToolCallDeltas)
+			case EventDone:
+				s.finalizeToolCalls()
+				s.done = true
+				s.mu.Unlock()
+				goto checkError
 			}
 			s.mu.Unlock()
 		}

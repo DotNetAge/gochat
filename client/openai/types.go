@@ -61,12 +61,13 @@ type Function struct {
 
 // ToolCall represents a tool call in the response
 type ToolCall struct {
-	ID       string `json:"id"`
-	Type     string `json:"type"` // "function"
+	Index    *int   `json:"index,omitempty"` // streaming delta index (nil in non-streaming)
+	ID       string `json:"id,omitempty"`
+	Type     string `json:"type,omitempty"` // "function"
 	Function struct {
-		Name      string `json:"name"`
-		Arguments string `json:"arguments"`
-	} `json:"function"`
+		Name      string `json:"name,omitempty"`
+		Arguments string `json:"arguments,omitempty"`
+	} `json:"function,omitempty"`
 }
 
 // ChatCompletionResponse represents the OpenAI-compatible chat completion response
