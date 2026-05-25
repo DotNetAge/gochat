@@ -99,11 +99,13 @@ type Usage struct {
 // PromptTokensDetails contains details about prompt tokens
 type PromptTokensDetails struct {
 	CachedTokens int `json:"cached_tokens,omitempty"`
+	AudioTokens  int `json:"audio_tokens,omitempty"`
 }
 
 // CompletionTokensDetails contains details about completion tokens
 type CompletionTokensDetails struct {
 	ReasoningTokens          int `json:"reasoning_tokens,omitempty"`
+	AudioTokens              int `json:"audio_tokens,omitempty"`
 	AcceptedPredictionTokens int `json:"accepted_prediction_tokens,omitempty"`
 	RejectedPredictionTokens int `json:"rejected_prediction_tokens,omitempty"`
 }
@@ -115,6 +117,7 @@ type StreamChunk struct {
 	Created int64          `json:"created"`
 	Model   string         `json:"model"`
 	Choices []StreamChoice `json:"choices"`
+	Usage   *Usage         `json:"usage,omitempty"`
 }
 
 // StreamChoice represents a choice in the streaming response

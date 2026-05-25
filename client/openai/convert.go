@@ -113,11 +113,7 @@ func ResponseFromWire(resp *ChatCompletionResponse) *core.Response {
 		return &core.Response{
 			ID:    resp.ID,
 			Model: resp.Model,
-			Usage: &core.Usage{
-				PromptTokens:     resp.Usage.PromptTokens,
-				CompletionTokens: resp.Usage.CompletionTokens,
-				TotalTokens:      resp.Usage.TotalTokens,
-			},
+			Usage: usageFromWire(&resp.Usage),
 		}
 	}
 
@@ -169,12 +165,36 @@ func ResponseFromWire(resp *ChatCompletionResponse) *core.Response {
 			ToolCalls: toolCalls,
 		},
 		ToolCalls: toolCalls,
-		Usage: &core.Usage{
-			PromptTokens:     resp.Usage.PromptTokens,
-			CompletionTokens: resp.Usage.CompletionTokens,
-			TotalTokens:      resp.Usage.TotalTokens,
-		},
+		Usage:     usageFromWire(&resp.Usage),
 	}
+}
+
+// usageFromWire converts OpenAI wire-format Usage to the canonical core.Usage,
+// preserving detailed token breakdowns (cached_tokens, reasoning_tokens, etc.).
+func usageFromWire(wire *Usage) *core.Usage {
+	if wire == nil {
+		return nil
+	}
+	u := &core.Usage{
+		PromptTokens:     wire.PromptTokens,
+		CompletionTokens: wire.CompletionTokens,
+		TotalTokens:      wire.TotalTokens,
+	}
+	if wire.PromptTokensDetails != nil {
+		u.PromptTokensDetails = &core.PromptTokensDetails{
+			CachedTokens: wire.PromptTokensDetails.CachedTokens,
+			AudioTokens:  wire.PromptTokensDetails.AudioTokens,
+		}
+	}
+	if wire.CompletionTokensDetails != nil {
+		u.CompletionTokensDetails = &core.CompletionTokensDetails{
+			ReasoningTokens:          wire.CompletionTokensDetails.ReasoningTokens,
+			AudioTokens:              wire.CompletionTokensDetails.AudioTokens,
+			AcceptedPredictionTokens: wire.CompletionTokensDetails.AcceptedPredictionTokens,
+			RejectedPredictionTokens: wire.CompletionTokensDetails.RejectedPredictionTokens,
+		}
+	}
+	return u
 }
 
 // ParseSSEStream parses Server-Sent Events stream and returns a channel of StreamChunks
@@ -215,7 +235,15 @@ func ParseSSEStream(reader io.Reader) <-chan StreamChunk {
 
 // StreamChunkToEvent converts a StreamChunk to core.StreamEvent
 func StreamChunkToEvent(chunk StreamChunk) core.StreamEvent {
+	// OpenAI streaming with include_usage=true sends a final chunk with empty
+	// choices and a usage field. Convert this to an EventDone with usage.
 	if len(chunk.Choices) == 0 {
+		if chunk.Usage != nil {
+			return core.StreamEvent{
+				Type:  core.EventDone,
+				Usage: usageFromWire(chunk.Usage),
+			}
+		}
 		return core.StreamEvent{Type: core.EventContent}
 	}
 
@@ -223,10 +251,14 @@ func StreamChunkToEvent(chunk StreamChunk) core.StreamEvent {
 
 	// Check for finish reason first — this indicates stream completion
 	if choice.FinishReason != "" {
-		return core.StreamEvent{
-			Type:          core.EventDone,
-			FinishReason:  choice.FinishReason,
+		ev := core.StreamEvent{
+			Type:         core.EventDone,
+			FinishReason: choice.FinishReason,
 		}
+		if chunk.Usage != nil {
+			ev.Usage = usageFromWire(chunk.Usage)
+		}
+		return ev
 	}
 
 	if choice.Delta != nil {

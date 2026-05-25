@@ -58,6 +58,30 @@ type Response struct {
 	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 }
 
+// PromptTokensDetails contains breakdown of prompt token consumption.
+type PromptTokensDetails struct {
+	// CachedTokens is the number of tokens read from the prompt cache.
+	CachedTokens int `json:"cached_tokens,omitempty"`
+
+	// AudioTokens is the number of audio tokens in the prompt.
+	AudioTokens int `json:"audio_tokens,omitempty"`
+}
+
+// CompletionTokensDetails contains breakdown of completion token consumption.
+type CompletionTokensDetails struct {
+	// ReasoningTokens is the number of tokens used for reasoning/thinking.
+	ReasoningTokens int `json:"reasoning_tokens,omitempty"`
+
+	// AudioTokens is the number of audio tokens in the completion.
+	AudioTokens int `json:"audio_tokens,omitempty"`
+
+	// AcceptedPredictionTokens is the number of tokens accepted from speculation.
+	AcceptedPredictionTokens int `json:"accepted_prediction_tokens,omitempty"`
+
+	// RejectedPredictionTokens is the number of tokens rejected from speculation.
+	RejectedPredictionTokens int `json:"rejected_prediction_tokens,omitempty"`
+}
+
 // Usage tracks token consumption for a request.
 //
 // Tokens are the basic units that LLM providers use for billing.
@@ -82,4 +106,12 @@ type Usage struct {
 	// TotalTokens is the sum of PromptTokens and CompletionTokens.
 	// This is typically what you're billed for.
 	TotalTokens int `json:"total_tokens"`
+
+	// PromptTokensDetails contains a breakdown of prompt token usage.
+	// Set when the provider returns detailed token information.
+	PromptTokensDetails *PromptTokensDetails `json:"prompt_tokens_details,omitempty"`
+
+	// CompletionTokensDetails contains a breakdown of completion token usage.
+	// Set when the provider returns detailed token information.
+	CompletionTokensDetails *CompletionTokensDetails `json:"completion_tokens_details,omitempty"`
 }
