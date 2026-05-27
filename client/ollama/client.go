@@ -243,6 +243,7 @@ func (c *Client) doChat(ctx context.Context, messages []core.Message, options co
 	var reasoningContent string
 	var usage core.Usage
 	var toolCalls []core.ToolCall
+	var finishReason string
 
 	scanner := bufio.NewScanner(resp.Body)
 	buf := make([]byte, 0, 1024*1024)
@@ -275,13 +276,19 @@ func (c *Client) doChat(ctx context.Context, messages []core.Message, options co
 				CompletionTokens: chunk.EvalCount,
 				TotalTokens:      chunk.PromptEvalCount + chunk.EvalCount,
 			}
+			finishReason = chunk.DoneReason
 		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("ollama scan error: %w", err)
 	}
 
 	return &core.Response{
 		Model:            c.ResolveModel(options),
 		Content:          content,
 		ReasoningContent: reasoningContent,
+		FinishReason:     finishReason,
 		Message: core.Message{
 			Role: core.RoleAssistant,
 			Content: []core.ContentBlock{

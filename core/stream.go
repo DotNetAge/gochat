@@ -68,6 +68,11 @@ type StreamEvent struct {
 	// accumulated by index to reconstruct the complete tool call.
 	ToolCallDeltas []ToolCallDelta
 
+	// Refusal is set when the content was generated from the refusal field
+	// (content_filter). Non-empty when the model's response was flagged by
+	// content moderation.
+	Refusal string
+
 	// FinishReason indicates why the model stopped generating.
 	// Set on EventDone: "stop", "tool_calls", "length", "content_filter".
 	FinishReason string
@@ -470,6 +475,66 @@ func (s *Stream) ReasoningText() (string, error) {
 	}
 
 checkError:
+	if s.current.Err != nil {
+		return buf.String(), s.current.Err
+	}
+	return buf.String(), nil
+}
+// RefusalText collects and returns all refusal content as a single string.
+// This is used when the model's response was flagged by content moderation
+// (finish_reason="content_filter"). Refusal text arrives incrementally via
+// delta.refusal in the streaming response.
+//
+// The method consumes the entire stream until it ends or an error
+// occurs. After RefusalText returns, the stream is fully consumed.
+//
+// Returns the concatenated refusal text and any error that occurred
+func (s *Stream) RefusalText() (string, error) {
+	var buf strings.Builder
+	for {
+		s.mu.Lock()
+		if s.done {
+			s.mu.Unlock()
+			break
+		}
+		select {
+		case <-s.doneCh:
+			s.done = true
+			s.mu.Unlock()
+			goto checkErrorRefusal
+		case ev, ok := <-s.ch:
+			if !ok {
+				s.done = true
+				s.mu.Unlock()
+				goto checkErrorRefusal
+			}
+			s.current = ev
+			if ev.Err != nil {
+				s.done = true
+				s.mu.Unlock()
+				return buf.String(), ev.Err
+			}
+			if ev.Usage != nil {
+				s.usage = ev.Usage
+			}
+			switch ev.Type {
+			case EventContent:
+				if ev.Refusal != "" {
+					buf.WriteString(ev.Content)
+				}
+			case EventToolCall:
+				s.accumulateToolCalls(ev.ToolCallDeltas)
+			case EventDone:
+				s.finalizeToolCalls()
+				s.done = true
+				s.mu.Unlock()
+				goto checkErrorRefusal
+			}
+			s.mu.Unlock()
+		}
+	}
+
+checkErrorRefusal:
 	if s.current.Err != nil {
 		return buf.String(), s.current.Err
 	}

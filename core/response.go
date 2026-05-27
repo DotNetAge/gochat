@@ -40,6 +40,10 @@ type Response struct {
 	// ReasoningContent is the model's thinking/reasoning process output.
 	ReasoningContent string `json:"reasoning_content,omitempty"`
 
+	// Refusal is set when the model refuses to generate content
+	// (finish_reason="content_filter"). Contains the refusal explanation.
+	Refusal string `json:"refusal,omitempty"`
+
 	// Message is the full structured message from the model.
 	// Use this when you need access to multimodal content or tool calls.
 	Message Message `json:"message"`

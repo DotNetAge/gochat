@@ -123,10 +123,20 @@ func ResponseFromWire(resp *ChatCompletionResponse) *core.Response {
 	var toolCalls []core.ToolCall
 
 	// Extract content
+	var refusal string
 	switch v := choice.Message.Content.(type) {
 	case string:
 		content = v
 		contentBlocks = []core.ContentBlock{{Type: core.ContentTypeText, Text: v}}
+		refusal = choice.Message.Refusal
+	case nil:
+		// Content is null when refusal is set (content_filter)
+		refusal = choice.Message.Refusal
+		// If content is null but refusal is set, use refusal as content
+		if refusal != "" {
+			content = refusal
+			contentBlocks = []core.ContentBlock{{Type: core.ContentTypeText, Text: refusal}}
+		}
 	case []interface{}:
 		// Multimodal content (not common in responses, but handle it)
 		for _, part := range v {
@@ -158,6 +168,7 @@ func ResponseFromWire(resp *ChatCompletionResponse) *core.Response {
 		Model:            resp.Model,
 		Content:          content,
 		ReasoningContent: choice.Message.ReasoningContent,
+		Refusal:          refusal,
 		FinishReason:     choice.FinishReason,
 		Message: core.Message{
 			Role:      choice.Message.Role,
@@ -291,6 +302,16 @@ func StreamChunkToEvent(chunk StreamChunk) core.StreamEvent {
 			return core.StreamEvent{
 				Type:    core.EventThinking,
 				Content: choice.Delta.ReasoningContent,
+			}
+		}
+		// Handle refusal content (content_filter). When content is
+		// flagged, delta.content is null and delta.refusal carries the
+		// explanation text.
+		if choice.Delta.Refusal != "" {
+			return core.StreamEvent{
+				Type:    core.EventContent,
+				Content: choice.Delta.Refusal,
+				Refusal: choice.Delta.Refusal,
 			}
 		}
 		// Handle regular content

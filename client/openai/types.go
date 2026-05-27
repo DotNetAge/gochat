@@ -29,6 +29,7 @@ type ChatCompletionRequest struct {
 type Message struct {
 	Role             string      `json:"role"`
 	Content          interface{} `json:"content"` // string or []ContentPart
+	Refusal          string      `json:"refusal,omitempty"`
 	ReasoningContent string      `json:"reasoning_content,omitempty"`
 	ToolCalls        []ToolCall  `json:"tool_calls,omitempty"`
 	ToolCallID       string      `json:"tool_call_id,omitempty"`
@@ -131,6 +132,7 @@ type StreamChoice struct {
 type Delta struct {
 	Role             string     `json:"role,omitempty"`
 	Content          string     `json:"content,omitempty"`
+	Refusal          string     `json:"refusal,omitempty"`
 	ReasoningContent string     `json:"reasoning_content,omitempty"`
 	ToolCalls        []ToolCall `json:"tool_calls,omitempty"`
 }

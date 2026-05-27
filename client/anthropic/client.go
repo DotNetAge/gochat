@@ -87,9 +87,10 @@ type streamChunk struct {
 }
 
 type streamDelta struct {
-	Type     string `json:"type"`
-	Text     string `json:"text,omitempty"`
-	Thinking string `json:"thinking,omitempty"`
+	Type       string `json:"type"`
+	Text       string `json:"text,omitempty"`
+	Thinking   string `json:"thinking,omitempty"`
+	StopReason string `json:"stop_reason,omitempty"`
 }
 
 type errorResponse struct {
@@ -207,18 +208,24 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 					}
 				}
 			case "message_stop":
-				ch <- core.StreamEvent{Type: core.EventDone}
+				// message_delta already sends EventDone with finish_reason and usage
 			case "message_delta":
+				finishReason := ""
+				if chunk.Delta != nil {
+					finishReason = chunk.Delta.StopReason
+				}
+				ev := core.StreamEvent{
+					Type:         core.EventDone,
+					FinishReason: finishReason,
+				}
 				if chunk.Usage != nil {
-					ch <- core.StreamEvent{
-						Type: core.EventDone,
-						Usage: &core.Usage{
-							PromptTokens:     chunk.Usage.InputTokens,
-							CompletionTokens: chunk.Usage.OutputTokens,
-							TotalTokens:      chunk.Usage.InputTokens + chunk.Usage.OutputTokens,
-						},
+					ev.Usage = &core.Usage{
+						PromptTokens:     chunk.Usage.InputTokens,
+						CompletionTokens: chunk.Usage.OutputTokens,
+						TotalTokens:      chunk.Usage.InputTokens + chunk.Usage.OutputTokens,
 					}
 				}
+				ch <- ev
 			}
 		}
 

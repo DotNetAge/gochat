@@ -112,8 +112,6 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 	// Handle EnableThinking
 	if options.Thinking {
 		reqBody.ExtraBody["enable_thinking"] = true
-	} else {
-		reqBody.ExtraBody["enable_thinking"] = false
 	}
 
 	if len(options.Tools) > 0 {
@@ -220,8 +218,6 @@ func (c *Client) doChat(ctx context.Context, messages []core.Message, options co
 	// Handle EnableThinking
 	if options.Thinking {
 		reqBody.ExtraBody["enable_thinking"] = true
-	} else {
-		reqBody.ExtraBody["enable_thinking"] = false
 	}
 
 	if len(options.Tools) > 0 {
