@@ -101,6 +101,10 @@ func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts .
 		ExtraBody:   make(map[string]interface{}),
 	}
 
+	reqBody.StreamOptions = map[string]interface{}{
+		"include_usage": true,
+	}
+
 	if options.EnableSearch {
 		reqBody.ExtraBody["enable_search"] = true
 	}

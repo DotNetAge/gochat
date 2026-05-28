@@ -69,6 +69,10 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 		ExtraBody:   make(map[string]interface{}),
 	}
 
+	reqBody.StreamOptions = map[string]interface{}{
+		"include_usage": true,
+	}
+
 	// DeepSeek-specific parameters MUST be in extra_body
 	if options.EnableSearch {
 		reqBody.ExtraBody["enable_search"] = true
