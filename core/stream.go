@@ -1,6 +1,7 @@
 package core
 
 import (
+	"fmt"
 	"io"
 	"runtime"
 	"strings"
@@ -206,16 +207,29 @@ func (s *Stream) finalizeToolCalls() {
 // stream has ended (either normally or due to an error) or if
 // Close was called.
 //
-// This method is safe for concurrent use. Only one goroutine
-// should call Next at a time, but Close may be called concurrently.
-//
-// Returns true if there is a new event available to process
+// IMPORTANT: With include_usage=true, providers send a trailing usage-only
+// chunk (choices:[]) AFTER the finish_reason chunk. We must continue
+// draining events even after EventDone to capture this late usage data.
 func (s *Stream) Next() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// After done, still drain remaining channel events to catch
+	// trailing usage-only chunks sent after finish_reason.
 	if s.done || s.closed {
-		return false
+		select {
+		case ev, ok := <-s.ch:
+			if !ok {
+				return false
+			}
+			s.current = ev
+			if ev.Usage != nil {
+				s.usage = ev.Usage
+			}
+			return true
+		default:
+			return false
+		}
 	}
 	select {
 	case <-s.doneCh:
@@ -236,6 +250,8 @@ func (s *Stream) Next() bool {
 		}
 		if ev.Usage != nil {
 			s.usage = ev.Usage
+			fmt.Printf("[SSE-TRACE L3] Stream.Next() captured usage: prompt=%d, completion=%d, total=%d, eventType=%s\n",
+				ev.Usage.PromptTokens, ev.Usage.CompletionTokens, ev.Usage.TotalTokens, ev.Type)
 		}
 		if ev.Type == EventToolCall {
 			s.accumulateToolCalls(ev.ToolCallDeltas)
@@ -347,6 +363,12 @@ func (s *Stream) Err() error {
 func (s *Stream) Usage() *Usage {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.usage != nil {
+		fmt.Printf("[SSE-TRACE L3] stream.Usage() called, returning: prompt=%d, completion=%d, total=%d\n",
+			s.usage.PromptTokens, s.usage.CompletionTokens, s.usage.TotalTokens)
+	} else {
+		fmt.Printf("[SSE-TRACE L3] stream.Usage() called, returning NIL\n")
+	}
 	return s.usage
 }
 

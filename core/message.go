@@ -85,10 +85,11 @@ type ContentBlock struct {
 
 // Message represents a single message in a conversation
 type Message struct {
-	Role       string         `json:"role"`
-	Content    []ContentBlock `json:"content,omitempty"`
-	ToolCalls  []ToolCall     `json:"tool_calls,omitempty"`   // assistant requesting tool use
-	ToolCallID string         `json:"tool_call_id,omitempty"` // for role=tool responses
+	Role             string         `json:"role"`
+	Content          []ContentBlock `json:"content,omitempty"`
+	ToolCalls        []ToolCall     `json:"tool_calls,omitempty"`    // assistant requesting tool use
+	ToolCallID       string         `json:"tool_call_id,omitempty"`  // for role=tool responses
+	ReasoningContent string         `json:"reasoning_content,omitempty"` // thinking/reasoning stream (DeepSeek-R1 etc.)
 }
 
 // NewTextMessage creates a message with text content

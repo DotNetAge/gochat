@@ -83,6 +83,7 @@ type ClientBuilder interface {
 	PresencePenalty(penalty float64) ClientBuilder
 	FrequencyPenalty(penalty float64) ClientBuilder // 频率惩罚
 	ResponseFormat(format string) ClientBuilder     // 设置响应格式， "json" / "text"
+	WithContext(ctx context.Context) ClientBuilder // 设置请求上下文（用于取消和超时控制）
 	GetResponse() (*core.Response, error)           // 获取默认（OpenAI）的响应
 	GetResponseFor(clientType ClientType) (*core.Response, error)
 	GetStream() (*core.Stream, error) // 获取默认（OpenAI）的流
@@ -93,6 +94,7 @@ type ClientBuilder interface {
 
 // defaultClientBuilder 是 ClientBuilder 接口的默认实现
 type defaultClientBuilder struct {
+	ctx      context.Context
 	config   core.Config
 	options  []core.Option
 	messages []core.Message
@@ -273,6 +275,11 @@ func (b *defaultClientBuilder) ResponseFormat(format string) ClientBuilder {
 	return b
 }
 
+func (b *defaultClientBuilder) WithContext(ctx context.Context) ClientBuilder {
+	b.ctx = ctx
+	return b
+}
+
 // SetAzureEndpoint 设置 Azure OpenAI 端点（仅 Azure 客户端需要）
 func (b *defaultClientBuilder) SetAzureEndpoint(endpoint string) ClientBuilder {
 	b.azureEndpoint = endpoint
@@ -337,7 +344,10 @@ func (b *defaultClientBuilder) GetResponseFor(clientType ClientType) (*core.Resp
 		return nil, err
 	}
 
-	ctx := context.Background()
+	ctx := b.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	return client.Chat(ctx, b.messages, b.options...)
 }
 
@@ -353,6 +363,9 @@ func (b *defaultClientBuilder) GetStreamFor(clientType ClientType) (*core.Stream
 		return nil, err
 	}
 
-	ctx := context.Background()
+	ctx := b.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	return client.ChatStream(ctx, b.messages, b.options...)
 }
