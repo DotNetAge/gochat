@@ -14,8 +14,12 @@ type ErrorType string
 // These values are used by the Error struct to categorize failures.
 const (
 	// ErrorTypeAPI indicates an error returned by the AI provider's API.
-	// This includes invalid requests, authentication failures, or rate limits.
+	// This includes invalid requests, authentication failures, or server errors.
 	ErrorTypeAPI ErrorType = "api_error"
+
+	// ErrorTypeRateLimit indicates the provider returned a rate limit error
+	// (HTTP 429). This is always retryable with backoff.
+	ErrorTypeRateLimit ErrorType = "rate_limit_error"
 
 	// ErrorTypeNetwork indicates a network connectivity issue.
 	// This includes connection timeouts, DNS failures, or refused connections.
@@ -27,6 +31,7 @@ const (
 
 	// ErrorTypeValidation indicates invalid input parameters.
 	// This occurs when request data fails validation checks.
+	// Validation errors are never retryable.
 	ErrorTypeValidation ErrorType = "validation_error"
 
 	// ErrorTypeUnknown indicates an unexpected error without classification.
@@ -58,6 +63,10 @@ type Error struct {
 	// Cause is the underlying error that triggered this one, if available.
 	// This may be nil if the error originated without a specific cause.
 	Cause error
+
+	// StatusCode is the HTTP status code from the provider's response,
+	// when applicable. Used to classify retryability (e.g., 429, 5xx).
+	StatusCode int
 }
 
 // Error implements the error interface and returns a formatted string
@@ -162,6 +171,12 @@ func NewUnknownError(message string, cause error) *Error {
 // NewAPIErrorFromResponse creates a new API error from HTTP response status and body.
 // This is a convenience method for creating standardized error responses.
 // It attempts to parse JSON error responses common to AI providers.
+//
+// The error is classified by status code for retryability:
+//   - 429 → ErrorTypeRateLimit (always retryable)
+//   - 408 → ErrorTypeTimeout (retryable)
+//   - 5xx → ErrorTypeAPI (retryable, server-side transient failure)
+//   - 4xx (other) → ErrorTypeAPI (not retryable, client error)
 func NewAPIErrorFromResponse(statusCode int, body []byte) *Error {
 	var errData struct {
 		Error struct {
@@ -181,5 +196,17 @@ func NewAPIErrorFromResponse(statusCode int, body []byte) *Error {
 		}
 	}
 
-	return NewAPIError(fmt.Sprintf("request failed with status %d: %s", statusCode, message), nil)
+	errType := ErrorTypeAPI
+	switch {
+	case statusCode == 429:
+		errType = ErrorTypeRateLimit
+	case statusCode == 408:
+		errType = ErrorTypeTimeout
+	}
+
+	return &Error{
+		Type:       errType,
+		Message:    fmt.Sprintf("request failed with status %d: %s", statusCode, message),
+		StatusCode: statusCode,
+	}
 }

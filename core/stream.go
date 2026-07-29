@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"io"
 	"runtime"
 	"strings"
@@ -250,8 +249,6 @@ func (s *Stream) Next() bool {
 		}
 		if ev.Usage != nil {
 			s.usage = ev.Usage
-			fmt.Printf("[SSE-TRACE L3] Stream.Next() captured usage: prompt=%d, completion=%d, total=%d, eventType=%s\n",
-				ev.Usage.PromptTokens, ev.Usage.CompletionTokens, ev.Usage.TotalTokens, ev.Type)
 		}
 		if ev.Type == EventToolCall {
 			s.accumulateToolCalls(ev.ToolCallDeltas)
@@ -363,12 +360,6 @@ func (s *Stream) Err() error {
 func (s *Stream) Usage() *Usage {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.usage != nil {
-		fmt.Printf("[SSE-TRACE L3] stream.Usage() called, returning: prompt=%d, completion=%d, total=%d\n",
-			s.usage.PromptTokens, s.usage.CompletionTokens, s.usage.TotalTokens)
-	} else {
-		fmt.Printf("[SSE-TRACE L3] stream.Usage() called, returning NIL\n")
-	}
 	return s.usage
 }
 

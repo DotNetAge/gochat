@@ -189,10 +189,35 @@ func (c *BaseClient) Chat(ctx context.Context, messages []Message, opts ...Optio
 // Returns:
 // - *Stream: Stream of events (content, usage, errors)
 // - error: Error if the request fails to start
+//
+// Retry semantics: retry only covers the connection/establishment phase
+// (the doStream call returning an error). Once a *Stream is successfully
+// returned, the stream is live and cannot be retried — mid-stream errors
+// are delivered as EventError and are not retried here, as doing so would
+// produce duplicate output to the consumer.
+//
+// Note: attachment processing and options application are performed inside
+// each provider's doStream implementation, NOT here, to avoid double
+// processing (BaseClient.Chat also relies on the same pattern where
+// doChat applies options internally).
 func (c *BaseClient) ChatStream(ctx context.Context, messages []Message, opts ...Option) (*Stream, error) {
 	if c.doStream == nil {
 		return nil, NewValidationError("stream function not set", nil)
 	}
 
-	return c.doStream(ctx, messages, opts...)
+	var stream *Stream
+	err := c.Retry(ctx, func() error {
+		s, err := c.doStream(ctx, messages, opts...)
+		if err != nil {
+			return err
+		}
+		stream = s
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return stream, nil
 }

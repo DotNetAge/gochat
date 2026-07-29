@@ -240,12 +240,6 @@ func ParseSSEStream(reader io.Reader) <-chan StreamChunk {
 				continue
 			}
 
-			// Diagnostic: log when usage chunk is received (include_usage=true)
-			if chunk.Usage != nil {
-				fmt.Printf("[SSE-TRACE L1] Raw usage chunk from DeepSeek: prompt=%d, completion=%d, total=%d, choices_len=%d\n",
-					chunk.Usage.PromptTokens, chunk.Usage.CompletionTokens, chunk.Usage.TotalTokens, len(chunk.Choices))
-			}
-
 			ch <- chunk
 		}
 	}()
@@ -260,8 +254,6 @@ func StreamChunkToEvent(chunk StreamChunk) core.StreamEvent {
 	if len(chunk.Choices) == 0 {
 		if chunk.Usage != nil {
 			u := usageFromWire(chunk.Usage)
-			fmt.Printf("[SSE-TRACE L2] EventDone from empty-choices chunk: prompt=%d, completion=%d, total=%d\n",
-				u.PromptTokens, u.CompletionTokens, u.TotalTokens)
 			return core.StreamEvent{
 				Type:  core.EventDone,
 				Usage: u,
@@ -280,10 +272,6 @@ func StreamChunkToEvent(chunk StreamChunk) core.StreamEvent {
 		}
 		if chunk.Usage != nil {
 			ev.Usage = usageFromWire(chunk.Usage)
-			fmt.Printf("[SSE-TRACE L2] EventDone from finish_reason=%s: prompt=%d, completion=%d, total=%d\n",
-				choice.FinishReason, ev.Usage.PromptTokens, ev.Usage.CompletionTokens, ev.Usage.TotalTokens)
-		} else {
-			fmt.Printf("[SSE-TRACE L2] EventDone from finish_reason=%s: NO USAGE DATA\n", choice.FinishReason)
 		}
 		return ev
 	}
