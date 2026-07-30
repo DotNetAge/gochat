@@ -186,6 +186,16 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 		defer close(ch)
 		defer resp.Body.Close()
 
+		// ctx 取消监听：当 ctx 被取消或超时时，主动关闭 resp.Body，
+		// 打断下方 scanner.Scan() 的阻塞读取。
+		// 这是修复流式卡死的关键：真实 LLM server 不一定监听客户端 ctx 取消，
+		// 不会主动关闭连接，导致 scanner.Scan() 永久阻塞。
+		// 关闭 resp.Body 会让 scanner.Scan() 立即返回错误并退出循环。
+		go func() {
+			<-ctx.Done()
+			_ = resp.Body.Close()
+		}()
+
 		// toolCallAcc 累加流式 tool_use 的 partial_json 片段。
 		// Anthropic 的工具参数通过 input_json_delta 分片到达，
 		// 累加后在 content_block_stop 时作为一个完整 ToolCallDelta 发出。
@@ -193,6 +203,7 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 
 		scanner := bufio.NewScanner(resp.Body)
 		for scanner.Scan() {
+			// ctx 已取消（body 被关闭后 scanner 可能返回最后一行或错误）
 			select {
 			case <-ctx.Done():
 				ch <- core.StreamEvent{Type: core.EventError, Err: ctx.Err()}

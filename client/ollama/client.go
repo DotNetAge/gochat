@@ -197,6 +197,17 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 		defer close(ch)
 		defer resp.Body.Close()
 
+		// ctx 取消监听：当 ctx 被取消或超时时，主动关闭 resp.Body，
+		// 打断下方 scanner.Scan() 的阻塞读取。
+		// 这是修复 ollama 流式卡死的关键：真实 ollama server 不监听客户端 ctx 取消，
+		// 不会主动关闭连接，导致 scanner.Scan() 永久阻塞。
+		// 关闭 resp.Body 会让 scanner.Scan() 立即返回错误并退出循环。
+		go func() {
+			<-ctx.Done()
+			// ctx 取消或超时，强制关闭 body 打断阻塞的 Read
+			_ = resp.Body.Close()
+		}()
+
 		// seenToolCalls 标记本次流是否出现过工具调用，
 		// 用于在 done 帧把 done_reason 由 "stop" 映射为 "tool_calls"。
 		seenToolCalls := false
@@ -205,6 +216,7 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 		buf := make([]byte, 0, 1024*1024)
 		scanner.Buffer(buf, 1024*1024)
 		for scanner.Scan() {
+			// ctx 已取消（body 被关闭后 scanner 可能返回最后一行或错误）
 			select {
 			case <-ctx.Done():
 				ch <- core.StreamEvent{Type: core.EventError, Err: ctx.Err()}
@@ -283,6 +295,11 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 			}
 		}
 
+		// scanner 退出后，优先检查 ctx 是否已取消（body 被 ctx 监听 goroutine 关闭）
+		if ctx.Err() != nil {
+			ch <- core.StreamEvent{Type: core.EventError, Err: ctx.Err()}
+			return
+		}
 		if err := scanner.Err(); err != nil {
 			ch <- core.StreamEvent{Type: core.EventError, Err: err}
 		}
@@ -410,6 +427,13 @@ func (c *Client) buildRequest(messages []core.Message, options core.Options, str
 			Role:       msg.Role,
 			Content:    msg.TextContent(),
 			ToolCallID: msg.ToolCallID, // role=tool 消息回传工具调用 ID（对齐 OpenAI tool_call_id）
+		}
+
+		// assistant 消息的 ReasoningContent 透传为 ollama 的 thinking 字段。
+		// thinking 模型（如 minicpm-v4.6）在多轮对话时，ollama 期望历史 assistant
+		// 消息携带 thinking 字段，缺失会导致模型丢失上下文思考过程，影响多轮对话质量。
+		if msg.Role == core.RoleAssistant && msg.ReasoningContent != "" {
+			ollamaMsg.Thinking = msg.ReasoningContent
 		}
 
 		// Extract base64 images from content blocks
