@@ -89,9 +89,7 @@ func main() {
 	fmt.Println("\nAnalyzing images...")
 
 	// Send request
-	response, err := client.Chat(context.Background(), messages,
-		core.WithMaxTokens(1500),
-	)
+	response, err := client.Chat(context.Background(), messages)
 	if err != nil {
 		log.Fatal(err)
 	}

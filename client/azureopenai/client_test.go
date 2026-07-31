@@ -108,7 +108,6 @@ func TestClient_Options(t *testing.T) {
 		var req openai.ChatCompletionRequest
 		json.NewDecoder(r.Body).Decode(&req)
 		assert.Equal(t, 0.5, req.Temperature)
-		assert.Equal(t, 100, req.MaxTokens)
 		assert.Equal(t, 0.9, req.TopP)
 
 		resp := openai.ChatCompletionResponse{
@@ -124,11 +123,9 @@ func TestClient_Options(t *testing.T) {
 	})
 
 	temp := 0.5
-	maxTokens := 100
 	topP := 0.9
 	_, err := client.Chat(context.Background(), []core.Message{core.NewUserMessage("hi")},
 		core.WithTemperature(temp),
-		core.WithMaxTokens(maxTokens),
 		core.WithTopP(topP),
 	)
 	assert.NoError(t, err)

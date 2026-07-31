@@ -94,7 +94,6 @@ func (c *Client) ChatStream(ctx context.Context, messages []core.Message, opts .
 	reqBody := openai.ChatCompletionRequest{
 		Messages:    openai.MessagesToWire(messages, options.SystemPrompt),
 		Temperature: c.ResolveTemperature(options),
-		MaxTokens:   c.ResolveMaxTokens(options),
 		TopP:        c.ResolveTopP(options),
 		Stop:        options.Stop,
 		Stream:      true,
@@ -174,7 +173,6 @@ func (c *Client) doChat(ctx context.Context, messages []core.Message, options co
 	reqBody := openai.ChatCompletionRequest{
 		Messages:    openai.MessagesToWire(messages, options.SystemPrompt),
 		Temperature: c.ResolveTemperature(options),
-		MaxTokens:   c.ResolveMaxTokens(options),
 		TopP:        c.ResolveTopP(options),
 		Stop:        options.Stop,
 		Stream:      stream,

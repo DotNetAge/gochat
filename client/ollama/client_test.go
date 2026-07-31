@@ -370,7 +370,6 @@ func TestMock_Options(t *testing.T) {
 	_, err := client.Chat(context.Background(),
 		[]core.Message{core.NewUserMessage("hi")},
 		core.WithTemperature(temp),
-		core.WithMaxTokens(100),
 		core.WithTopP(topP),
 		core.WithTopK(topK),
 		core.WithStop("END", "STOP"),
@@ -381,7 +380,6 @@ func TestMock_Options(t *testing.T) {
 
 	require.NotNil(t, gotReq.Options)
 	assert.Equal(t, temp, *gotReq.Options.Temperature)
-	assert.Equal(t, 100, *gotReq.Options.NumPredict)
 	assert.Equal(t, topP, *gotReq.Options.TopP)
 	assert.Equal(t, topK, *gotReq.Options.TopK)
 	assert.Equal(t, []string{"END", "STOP"}, gotReq.Options.Stop)
@@ -556,8 +554,7 @@ func TestLive_ChatStreamWithThinking(t *testing.T) {
 	skipUnlessLive(t)
 	client := newLiveClient(t)
 	stream, err := client.ChatStream(context.Background(),
-		[]core.Message{core.NewUserMessage("What is 1+1?")},
-		core.WithMaxTokens(30))
+		[]core.Message{core.NewUserMessage("What is 1+1?")})
 	require.NoError(t, err)
 	defer stream.Close()
 	var hasEvent bool
@@ -575,8 +572,7 @@ func TestLive_ChatWithOptions(t *testing.T) {
 	client := newLiveClient(t)
 	resp, err := client.Chat(context.Background(),
 		[]core.Message{core.NewUserMessage("What is 1+1?")},
-		core.WithTemperature(0.0),
-		core.WithMaxTokens(500))
+		core.WithTemperature(0.0))
 	require.NoError(t, err)
 	assert.True(t, resp.Content != "" || resp.ReasoningContent != "")
 }

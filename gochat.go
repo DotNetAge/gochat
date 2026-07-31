@@ -61,7 +61,6 @@ type ClientBuilder interface {
 	Messages(messages ...core.Message) ClientBuilder // 批量设置消息
 	Temperature(temp float64) ClientBuilder          // 采样温度，控制模型生成文本的多样性。temperature越高，生成的文本更多样，反之，生成的文本更确定。
 	Model(model string) ClientBuilder                // 用于指定模型名称
-	MaxTokens(max int) ClientBuilder                 // 用于限制模型输出的最大 Token 数。若生成内容超过此值，生成将提前停止，且返回的finish_reason为length。
 	Stop(stop ...string) ClientBuilder               // 用于指定停止词。当模型生成的文本中出现stop 指定的字符串或token_id时，生成将立即终止。
 	TopP(top float64) ClientBuilder                  // 核采样的概率阈值，控制模型生成文本的多样性。
 	TopK(top int) ClientBuilder                      // 指定生成过程中用于采样的候选 Token 数量。值越大，输出越随机；值越小，输出越确定。若设为 null 或大于 100，则禁用 top_k 策略，仅 top_p 策略生效。取值必须为大于或等于 0 的整数。
@@ -137,12 +136,6 @@ func (b *defaultClientBuilder) Temperature(temp float64) ClientBuilder {
 // Model 设置模型名称
 func (b *defaultClientBuilder) Model(model string) ClientBuilder {
 	b.options = append(b.options, core.WithModel(model))
-	return b
-}
-
-// MaxTokens 设置最大生成 token 数
-func (b *defaultClientBuilder) MaxTokens(max int) ClientBuilder {
-	b.options = append(b.options, core.WithMaxTokens(max))
 	return b
 }
 

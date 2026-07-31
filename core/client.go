@@ -22,7 +22,6 @@ import (
 //
 //	response, err := client.Chat(ctx, messages,
 //	    core.WithTemperature(0.8),
-//	    core.WithMaxTokens(1000),
 //	)
 type Client interface {
 	// Chat sends messages and returns a complete response

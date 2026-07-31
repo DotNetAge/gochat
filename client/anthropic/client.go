@@ -384,16 +384,11 @@ func (c *Client) buildRequest(messages []core.Message, options core.Options, str
 		}
 	}
 
-	maxTokens := c.ResolveMaxTokens(options)
-	if maxTokens == 0 {
-		maxTokens = 4096 // Anthropic requires max_tokens
-	}
-
 	req := anthropicRequest{
 		Model:     c.ResolveModel(options),
 		Messages:  anthropicMessages,
 		System:    systemPrompt,
-		MaxTokens: maxTokens,
+		MaxTokens: 4096, // Anthropic requires max_tokens
 		Stream:    stream,
 	}
 

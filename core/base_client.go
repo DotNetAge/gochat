@@ -16,7 +16,6 @@ type Config struct {
 	Timeout     time.Duration
 	MaxRetries  int
 	Temperature float64
-	MaxTokens   int
 }
 
 // ChatFunc is the function signature for chat execution
@@ -29,8 +28,8 @@ type StreamFunc func(ctx context.Context, messages []Message, opts ...Option) (*
 type BaseClient struct {
 	config     Config
 	httpClient *http.Client
-	doChat     ChatFunc      // injected chat execution function
-	doStream   StreamFunc    // injected stream execution function
+	doChat     ChatFunc   // injected chat execution function
+	doStream   StreamFunc // injected stream execution function
 }
 
 // New creates a new base client
@@ -111,14 +110,6 @@ func (c *BaseClient) ResolveTemperature(opts Options) float64 {
 		return *opts.Temperature
 	}
 	return c.config.Temperature
-}
-
-// ResolveMaxTokens returns the max tokens from options if set, otherwise from config
-func (c *BaseClient) ResolveMaxTokens(opts Options) int {
-	if opts.MaxTokens != nil {
-		return *opts.MaxTokens
-	}
-	return c.config.MaxTokens
 }
 
 // ResolveTopP returns the top-p from options if set, otherwise returns 0

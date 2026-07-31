@@ -101,7 +101,6 @@ gochat.NewClientBuilder().
     Init(config).
     Model("gpt-4o").           // 设置模型
     Temperature(0.7).          // 设置温度
-    MaxTokens(1000).           // 最大 token 数
     TopP(0.9).                 // Top-p 采样
     Stop("###", "END").        // 停止序列
     EnableThinking(true).      // 启用思考模式

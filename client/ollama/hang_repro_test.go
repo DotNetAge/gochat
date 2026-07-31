@@ -57,7 +57,6 @@ func TestLive_HangRepro_LargeSystemPrompt(t *testing.T) {
 
 	stream, err := client.ChatStream(ctx, messages,
 		core.WithTools(tools...),
-		core.WithMaxTokens(500),
 	)
 	require.NoError(t, err)
 	defer stream.Close()
@@ -120,7 +119,6 @@ func TestLive_CtxCancel_BreaksBlockedStream(t *testing.T) {
 	start := time.Now()
 	stream, err := client.ChatStream(ctx, messages,
 		core.WithTools(tools...),
-		core.WithMaxTokens(500),
 	)
 	require.NoError(t, err)
 	defer stream.Close()
@@ -182,7 +180,6 @@ func TestLive_CtxTimeout_BreaksBlockedStream(t *testing.T) {
 	start := time.Now()
 	stream, err := client.ChatStream(ctx, messages,
 		core.WithTools(tools...),
-		core.WithMaxTokens(500),
 	)
 	// 若请求建立阶段就超时，也是正确行为（ctx 超时生效）
 	if err != nil {
@@ -395,7 +392,6 @@ func TestLive_MindxRepro_FullRequestBody(t *testing.T) {
 		options := core.ApplyOptions(
 			core.WithSystemPrompt(systemPrompt),
 			core.WithTemperature(0.0),
-			core.WithMaxTokens(500),
 		)
 		reqBody := client.buildRequest(messages, options, true)
 		jsonData, err := json.MarshalIndent(reqBody, "", "  ")
@@ -442,7 +438,6 @@ func TestLive_MindxRepro_FullRequestBody(t *testing.T) {
 	stream, err := client.ChatStream(ctx, messages,
 		core.WithSystemPrompt(systemPrompt),
 		core.WithTemperature(0.0),
-		core.WithMaxTokens(500),
 	)
 	require.NoError(t, err)
 	defer stream.Close()

@@ -24,39 +24,13 @@ func skipIfNoAPIKey(t *testing.T) {
 	}
 }
 
-// TestMaxTokens 测试最大Tokens限制
-func TestMaxTokens(t *testing.T) {
-	skipIfNoAPIKey(t)
-	
-	builder := Client().
-		Config(WithAPIKey(testAPIKey), WithModel(testModel)).
-		MaxTokens(50).
-		EnableThinking(false). // 关闭思考模式，否则 max_tokens 不限制思考过程长度
-		UserMessage("请详细介绍一下 Go 语言的历史、特性和应用场景")
-
-	resp, err := builder.GetResponseFor(QwenClient)
-	if err != nil {
-		t.Fatalf("请求失败: %v", err)
-
-	}
-
-	t.Logf("响应内容: %s", resp.Content)
-	t.Logf("实际Tokens使用: Prompt=%d, Completion=%d, Total=%d",
-		resp.Usage.PromptTokens, resp.Usage.CompletionTokens, resp.Usage.TotalTokens)
-
-	// 验证生成的 token 数不超过限制（允许一定误差）
-	if resp.Usage.CompletionTokens > 60 {
-		t.Errorf("生成的 tokens 数量超过限制: got %d, want <= 60", resp.Usage.CompletionTokens)
-	}
-}
 
 // TestStopSequences 测试停止词
 func TestStopSequences(t *testing.T) {
 	skipIfNoAPIKey(t)
-	
+
 	builder := Client().
 		Config(WithAPIKey(testAPIKey), WithModel(testModel)).
-		MaxTokens(200).
 		Stop("。", "！").
 		UserMessage("请列举 5 种编程语言")
 
@@ -78,7 +52,7 @@ func TestStopSequences(t *testing.T) {
 // TestUsageStatistics 测试用量返回统计
 func TestUsageStatistics(t *testing.T) {
 	skipIfNoAPIKey(t)
-	
+
 	var receivedUsage *core.Usage
 
 	builder := Client().
@@ -116,7 +90,7 @@ func TestUsageStatistics(t *testing.T) {
 // TestMultiTurnConversation 测试多轮对话
 func TestMultiTurnConversation(t *testing.T) {
 	skipIfNoAPIKey(t)
-	
+
 	builder := Client().
 		Config(WithAPIKey(testAPIKey), WithModel(testModel)).
 		SystemMessage("你是一个专业的 Go 语言教学助手，回答要简洁明了").
@@ -141,7 +115,7 @@ func TestMultiTurnConversation(t *testing.T) {
 // TestToolCalling 测试工具调用
 func TestToolCalling(t *testing.T) {
 	skipIfNoAPIKey(t)
-	
+
 	// 定义天气查询工具
 	weatherTool := core.Tool{
 		Name:        "get_weather",
@@ -186,7 +160,7 @@ func TestToolCalling(t *testing.T) {
 // TestThinkingMode 测试思想流（深度思考）
 func TestThinkingMode(t *testing.T) {
 	skipIfNoAPIKey(t)
-	
+
 	builder := Client().
 		Config(WithAPIKey(testAPIKey), WithModel(testModel)).
 		EnableThinking(true).
@@ -212,7 +186,7 @@ func TestThinkingMode(t *testing.T) {
 // TestWebSearch 测试网络搜索
 func TestWebSearch(t *testing.T) {
 	skipIfNoAPIKey(t)
-	
+
 	builder := Client().
 		Config(WithAPIKey(testAPIKey), WithModel(testModel)).
 		EnableSearch(true).
@@ -237,7 +211,7 @@ func TestWebSearch(t *testing.T) {
 // TestFileAttachment 测试附加文件理解
 func TestFileAttachment(t *testing.T) {
 	skipIfNoAPIKey(t)
-	
+
 	// 读取本项目的 README.md
 	readmePath := "README.md"
 	readmeData, err := os.ReadFile(readmePath)
@@ -290,11 +264,10 @@ func TestFileAttachment(t *testing.T) {
 // TestStreamingOutput 测试流式输出
 func TestStreamingOutput(t *testing.T) {
 	skipIfNoAPIKey(t)
-	
+
 	builder := Client().
 		Config(WithAPIKey(testAPIKey), WithModel(testModel)).
 		EnableThinking(false). // 关闭思考模式以避免超长响应
-		MaxTokens(100).        // 限制生成长度
 		IncrementalOutput(true).
 		UserMessage("请写一首关于程序员的短诗")
 
@@ -351,14 +324,13 @@ func TestStreamingOutput(t *testing.T) {
 // TestAllFeaturesIntegration 综合集成测试
 func TestAllFeaturesIntegration(t *testing.T) {
 	skipIfNoAPIKey(t)
-	
+
 	// 读取 README
 	readmeData, _ := os.ReadFile("README.md")
 
 	builder := Client().
 		Config(WithAPIKey(testAPIKey), WithModel(testModel)).
 		SystemMessage("你是一个专业的技术文档分析助手").
-		MaxTokens(300).
 		Attach(core.Attachment{
 			MediaType: "text/markdown",
 			Name:      "README.md",

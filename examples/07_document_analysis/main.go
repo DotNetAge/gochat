@@ -69,7 +69,6 @@ func main() {
 	// Send the request
 	response, err := client.Chat(context.Background(), messages,
 		core.WithTemperature(0.3), // Lower temperature for more focused analysis
-		core.WithMaxTokens(1000),
 	)
 	if err != nil {
 		log.Fatal(err)

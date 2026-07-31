@@ -101,7 +101,6 @@ gochat.NewClientBuilder().
     Init(config).
     Model("gpt-4o").           // Set model
     Temperature(0.7).          // Set temperature
-    MaxTokens(1000).           // Max tokens
     TopP(0.9).                 // Top-p sampling
     Stop("###", "END").        // Stop sequences
     EnableThinking(true).      // Enable thinking mode

@@ -82,9 +82,7 @@ func TestClient_ChatStreamWithThinking(t *testing.T) {
 		core.NewUserMessage("What is 1+1?"),
 	}
 
-	stream, err := client.ChatStream(context.Background(), messages,
-		core.WithMaxTokens(30),
-	)
+	stream, err := client.ChatStream(context.Background(), messages)
 	require.NoError(t, err)
 	defer stream.Close()
 
@@ -143,7 +141,6 @@ func TestClient_ChatWithOptions(t *testing.T) {
 
 	response, err := client.Chat(context.Background(), messages,
 		core.WithTemperature(0.0),
-		core.WithMaxTokens(50),
 		core.WithUsageCallback(func(u core.Usage) {
 			t.Logf("Usage: total=%d, prompt=%d, completion=%d", u.TotalTokens, u.PromptTokens, u.CompletionTokens)
 		}),

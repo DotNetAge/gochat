@@ -68,7 +68,7 @@ type ollamaRequest struct {
 
 // ollamaOptions 对应 ollama 原生 /api/chat 的 options 字段。
 // ollama 原生支持这些采样参数（与 OpenAI 参数语义对齐）：
-//   - temperature / top_p / top_k / num_predict(max_tokens) / stop
+//   - temperature / top_p / top_k / stop
 //   - frequency_penalty / presence_penalty（ollama 新版已支持，与 OpenAI 同名）
 //   - repeat_penalty（ollama 独有，近似 presence_penalty+frequency_penalty 的合并，
 //     core.Options 无对应字段，保留供未来扩展）
@@ -76,7 +76,6 @@ type ollamaRequest struct {
 // 用指针类型区分"未设置"与"零值"，与 core.Options 保持一致。
 type ollamaOptions struct {
 	Temperature      *float64 `json:"temperature,omitempty"`
-	NumPredict       *int     `json:"num_predict,omitempty"` // max tokens
 	TopP             *float64 `json:"top_p,omitempty"`
 	TopK             *int     `json:"top_k,omitempty"`
 	Stop             []string `json:"stop,omitempty"`
@@ -518,7 +517,6 @@ func (c *Client) buildRequest(messages []core.Message, options core.Options, str
 // 返回 nil 表示无需设置 options 字段。
 // 该方法把 OpenAI 风格的采样参数映射到 ollama 原生 options，保证三 provider 行为对齐：
 //   - Temperature / TopP / TopK / Stop / PresencePenalty / FrequencyPenalty 直接对应
-//   - MaxTokens → NumPredict
 //   - Seed 透传（ollama 支持可复现采样）
 func (c *Client) buildOllamaOptions(options core.Options) *ollamaOptions {
 	opts := &ollamaOptions{}
@@ -535,15 +533,6 @@ func (c *Client) buildOllamaOptions(options core.Options) *ollamaOptions {
 		anySet = true
 	} else if t := c.Config().Temperature; t != 0 {
 		opts.Temperature = &t
-		anySet = true
-	}
-
-	// NumPredict (max tokens)
-	if options.MaxTokens != nil {
-		opts.NumPredict = options.MaxTokens
-		anySet = true
-	} else if mt := c.Config().MaxTokens; mt > 0 {
-		opts.NumPredict = &mt
 		anySet = true
 	}
 

@@ -11,10 +11,6 @@ func TestOptionFunctions(t *testing.T) {
 	opts := []Option{WithTemperature(0.8)}
 	assert.Len(t, opts, 1)
 
-	// Test WithMaxTokens
-	opts = []Option{WithMaxTokens(1000)}
-	assert.Len(t, opts, 1)
-
 	// Test WithTopP
 	opts = []Option{WithTopP(0.9)}
 	assert.Len(t, opts, 1)
@@ -54,7 +50,6 @@ func TestApplyOptions(t *testing.T) {
 	opts := ApplyOptions(
 		WithModel("gpt-4"),
 		WithTemperature(0.7),
-		WithMaxTokens(500),
 		WithTopP(0.95),
 		WithStop("stop1"),
 		WithSystemPrompt("You are a helpful assistant"),
@@ -65,8 +60,6 @@ func TestApplyOptions(t *testing.T) {
 	assert.Equal(t, "gpt-4", opts.Model)
 	assert.NotNil(t, opts.Temperature)
 	assert.Equal(t, 0.7, *opts.Temperature)
-	assert.NotNil(t, opts.MaxTokens)
-	assert.Equal(t, 500, *opts.MaxTokens)
 	assert.NotNil(t, opts.TopP)
 	assert.Equal(t, 0.95, *opts.TopP)
 	assert.Len(t, opts.Stop, 1)
