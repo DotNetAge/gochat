@@ -167,6 +167,13 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 			default:
 			}
 
+			// 流读取出错（连接被重置 / 超时 / body 被关闭）时透传为 EventError，
+			// 避免异常断开被误判为正常结束而静默收尾。
+			if chunk.Error != nil {
+				ch <- core.StreamEvent{Type: core.EventError, Err: chunk.Error}
+				return
+			}
+
 			event := StreamChunkToEvent(chunk)
 			ch <- event
 		}
@@ -179,13 +186,13 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 func (c *Client) doChat(ctx context.Context, messages []core.Message, options core.Options, stream bool) (*core.Response, error) {
 	model := c.BaseClient.ResolveModel(options)
 	reqBody := ChatCompletionRequest{
-		Model:            model,
-		Messages:         MessagesToWire(messages, options.SystemPrompt),
-		Temperature:      c.BaseClient.ResolveTemperature(options),
-		TopP:             c.BaseClient.ResolveTopP(options),
-		Stop:             options.Stop,
-		Stream:           stream,
-		ExtraBody:        make(map[string]interface{}),
+		Model:       model,
+		Messages:    MessagesToWire(messages, options.SystemPrompt),
+		Temperature: c.BaseClient.ResolveTemperature(options),
+		TopP:        c.BaseClient.ResolveTopP(options),
+		Stop:        options.Stop,
+		Stream:      stream,
+		ExtraBody:   make(map[string]interface{}),
 	}
 
 	// Qwen-specific parameters MUST be in extra_body

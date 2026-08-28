@@ -242,6 +242,14 @@ func ParseSSEStream(reader io.Reader) <-chan StreamChunk {
 
 			ch <- chunk
 		}
+
+		// 读取中途出错（连接被重置 / 超时 / ctx 取消导致 body 被关闭）时，
+		// 把错误透传给生产者，使其转成 EventError。
+		// 修复前：错误被静默吞掉，通道直接关闭，消费端把异常断开误判为正常结束
+		// （配合 core.Stream.Next 的锁重入 bug 会造成永久卡死）。
+		if err := scanner.Err(); err != nil {
+			ch <- StreamChunk{Error: err}
+		}
 	}()
 
 	return ch

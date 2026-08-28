@@ -4,21 +4,21 @@ import "encoding/json"
 
 // ChatCompletionRequest represents the OpenAI-compatible chat completion request
 type ChatCompletionRequest struct {
-	Model            string                 `json:"model"`
-	Messages         []Message              `json:"messages"`
-	Temperature      float64                `json:"temperature,omitempty"`
-	TopP             float64                `json:"top_p,omitempty"`
-	Stop             []string               `json:"stop,omitempty"`
-	Stream           bool                   `json:"stream,omitempty"`
-	StreamOptions    map[string]interface{} `json:"stream_options,omitempty"`
-	ReasoningEffort  string                 `json:"reasoning_effort,omitempty"` // for OpenAI o1/o3
-	Tools            []Tool                 `json:"tools,omitempty"`
-	TopK             *int                   `json:"top_k,omitempty"`
-	PresencePenalty  *float64               `json:"presence_penalty,omitempty"`
-	FrequencyPenalty *float64               `json:"frequency_penalty,omitempty"`
+	Model             string                 `json:"model"`
+	Messages          []Message              `json:"messages"`
+	Temperature       float64                `json:"temperature,omitempty"`
+	TopP              float64                `json:"top_p,omitempty"`
+	Stop              []string               `json:"stop,omitempty"`
+	Stream            bool                   `json:"stream,omitempty"`
+	StreamOptions     map[string]interface{} `json:"stream_options,omitempty"`
+	ReasoningEffort   string                 `json:"reasoning_effort,omitempty"` // for OpenAI o1/o3
+	Tools             []Tool                 `json:"tools,omitempty"`
+	TopK              *int                   `json:"top_k,omitempty"`
+	PresencePenalty   *float64               `json:"presence_penalty,omitempty"`
+	FrequencyPenalty  *float64               `json:"frequency_penalty,omitempty"`
 	ParallelToolCalls *bool                  `json:"parallel_tool_calls,omitempty"`
-	ToolChoice       interface{}            `json:"tool_choice,omitempty"`
-	ResponseFormat   interface{}            `json:"response_format,omitempty"`
+	ToolChoice        interface{}            `json:"tool_choice,omitempty"`
+	ResponseFormat    interface{}            `json:"response_format,omitempty"`
 
 	// ExtraBody for provider-specific parameters (e.g., Qwen)
 	ExtraBody map[string]interface{} `json:"extra_body,omitempty"`
@@ -118,6 +118,11 @@ type StreamChunk struct {
 	Model   string         `json:"model"`
 	Choices []StreamChoice `json:"choices"`
 	Usage   *Usage         `json:"usage,omitempty"`
+
+	// Error 在读取流式响应失败时携带底层错误（连接被重置 / 超时 / ctx 取消等），
+	// 供生产者将静默的 EOF 转成 EventError，避免客户端把「连接异常断开」误判为正常结束。
+	// 仅用于进程内传递，不参与 JSON 序列化。
+	Error error `json:"-"`
 }
 
 // StreamChoice represents a choice in the streaming response

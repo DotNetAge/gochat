@@ -105,19 +105,19 @@ type streamToolCallState struct {
 // The Close method should be called when the stream is no longer needed
 // to ensure proper cleanup of underlying resources.
 type Stream struct {
-	ch       <-chan StreamEvent
-	current  StreamEvent
-	done     bool
-	closed   bool
-	closer   io.Closer
-	usage    *Usage
-	mu       sync.Mutex
-	doneCh   chan struct{}
-	once     sync.Once
+	ch      <-chan StreamEvent
+	current StreamEvent
+	done    bool
+	closed  bool
+	closer  io.Closer
+	usage   *Usage
+	mu      sync.Mutex
+	doneCh  chan struct{}
+	once    sync.Once
 
 	// Tool call accumulation state
-	toolCallAcc   map[int]*streamToolCallState // accumulation state by delta index
-	toolCalls     []ToolCall                   // final accumulated tool calls
+	toolCallAcc map[int]*streamToolCallState // accumulation state by delta index
+	toolCalls   []ToolCall                   // final accumulated tool calls
 }
 
 // NewStream creates a new Stream wrapping the provided event channel.
@@ -233,12 +233,12 @@ func (s *Stream) Next() bool {
 	select {
 	case <-s.doneCh:
 		s.done = true
-		s.autoClose()
+		s.closeInternal()
 		return false
 	case ev, ok := <-s.ch:
 		if !ok {
 			s.done = true
-			s.autoClose()
+			s.closeInternal()
 			s.finalizeToolCalls()
 			return false
 		}
@@ -276,14 +276,6 @@ func (s *Stream) closeInternal() {
 		s.closer.Close()
 		s.closed = true
 	}
-}
-
-// autoClose attempts to close the underlying closer if the stream is done.
-// It does not wait for the channel to drain like Close() does.
-func (s *Stream) autoClose() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.closeInternal()
 }
 
 // Event returns the most recent event received from the last call to Next.
@@ -493,6 +485,7 @@ checkError:
 	}
 	return buf.String(), nil
 }
+
 // RefusalText collects and returns all refusal content as a single string.
 // This is used when the model's response was flagged by content moderation
 // (finish_reason="content_filter"). Refusal text arrives incrementally via

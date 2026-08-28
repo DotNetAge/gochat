@@ -116,6 +116,30 @@ func TestStream_Next_AfterClose(t *testing.T) {
 	assert.False(t, stream.Next())
 }
 
+// TestStream_Next_ChannelClosedWithoutDone 回归：生产者未发送 EventDone/EventError 就关闭
+// 通道（模型端静默断开 / 连接被超时打断）时，Next() 必须快速返回 false。
+// 修复前：Next() 命中 `!ok` 分支调用 autoClose()，与自身持有的锁重入导致永久死锁。
+func TestStream_Next_ChannelClosedWithoutDone(t *testing.T) {
+	ch := make(chan StreamEvent)
+	stream := NewStream(ch, nil)
+
+	go func() {
+		close(ch)
+	}()
+
+	nextReturned := make(chan bool, 1)
+	go func() {
+		nextReturned <- stream.Next()
+	}()
+
+	select {
+	case v := <-nextReturned:
+		assert.False(t, v, "流结束后 Next() 应返回 false")
+	case <-time.After(3 * time.Second):
+		t.Fatal("Next() 未在 3 秒内返回，存在锁重入死锁")
+	}
+}
+
 func TestStream_Usage_AfterClose(t *testing.T) {
 	ch := make(chan StreamEvent, 2)
 	ch <- StreamEvent{Type: EventContent, Content: "test"}

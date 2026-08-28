@@ -134,6 +134,13 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 			default:
 			}
 
+			// 流读取出错（连接被重置 / 超时 / body 被关闭）时透传为 EventError，
+			// 避免异常断开被误判为正常结束而静默收尾。
+			if chunk.Error != nil {
+				ch <- core.StreamEvent{Type: core.EventError, Err: chunk.Error}
+				return
+			}
+
 			event := openai.StreamChunkToEvent(chunk)
 			ch <- event
 		}
