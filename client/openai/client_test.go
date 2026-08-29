@@ -303,3 +303,48 @@ func TestClient_ToolCallingWithResult(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, finalResponse.Content)
 }
+
+func TestChatCompletionsURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		baseURL  string
+		expected string
+	}{
+		{
+			name:     "无版本段的地址自动补 /v1",
+			baseURL:  "https://api.openai.com",
+			expected: "https://api.openai.com/v1/chat/completions",
+		},
+		{
+			name:     "兼容模式的 dashscope 自动补 /v1",
+			baseURL:  "https://dashscope.aliyuncs.com/compatible-mode",
+			expected: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+		},
+		{
+			name:     "智谱 /v4 结尾不追加 /v1",
+			baseURL:  "https://open.bigmodel.cn/api/paas/v4",
+			expected: "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+		},
+		{
+			name:     "火山引擎 /v3 结尾不追加 /v1",
+			baseURL:  "https://ark.cn-beijing.volces.com/api/v3",
+			expected: "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+		},
+		{
+			name:     "已带 /v1 不重复追加",
+			baseURL:  "https://api.moonshot.cn/v1",
+			expected: "https://api.moonshot.cn/v1/chat/completions",
+		},
+		{
+			name:     "末尾斜杠会被去掉",
+			baseURL:  "http://localhost:11434/v1/",
+			expected: "http://localhost:11434/v1/chat/completions",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, chatCompletionsURL(tt.baseURL))
+		})
+	}
+}

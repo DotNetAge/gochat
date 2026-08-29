@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/DotNetAge/gochat/core"
@@ -59,6 +60,21 @@ func NewOpenAI(config core.Config) (*Client, error) {
 	client.SetStreamFunc(client.doChatStream)
 
 	return client, nil
+}
+
+// chatVersionRe 用于识别 baseURL 末尾是否已携带 API 版本段（如 /v1、/v3、/v4）。
+// 不同供应商的版本号约定不一致：OpenAI 用 /v1、火山引擎用 /v3、智谱用 /v4，
+// 因此不能只判断是否以 /v1 结尾，否则会给已带 /v3、/v4 的地址错误地追加 /v1。
+var chatVersionRe = regexp.MustCompile(`/v\d+$`)
+
+// chatCompletionsURL 根据 baseURL 拼出兼容 OpenAI 的聊天补全接口地址。
+// 若末尾已带 API 版本段则直接追加 /chat/completions，否则补上 /v1。
+func chatCompletionsURL(baseURL string) string {
+	baseURL = strings.TrimSuffix(baseURL, "/")
+	if !chatVersionRe.MatchString(baseURL) {
+		baseURL += "/v1"
+	}
+	return baseURL + "/chat/completions"
 }
 
 // doChatStream performs the actual streaming chat request
@@ -122,12 +138,7 @@ func (c *Client) doChatStream(ctx context.Context, messages []core.Message, opts
 		return nil, core.NewValidationError("failed to marshal request", err)
 	}
 
-	// NOTES: 所有兼容OpenAI的请求都约定俗成地使用/v1/chat/completions作为请求路径的结尾
-	baseURL := strings.TrimSuffix(c.Config().BaseURL, "/")
-	if !strings.HasSuffix(baseURL, "/v1") {
-		baseURL = baseURL + "/v1"
-	}
-	url := fmt.Sprintf("%s/chat/completions", baseURL)
+	url := chatCompletionsURL(c.Config().BaseURL)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
 	if err != nil {
@@ -233,11 +244,7 @@ func (c *Client) doChat(ctx context.Context, messages []core.Message, options co
 	if err != nil {
 		return nil, core.NewValidationError("failed to marshal request", err)
 	}
-	baseURL := strings.TrimSuffix(c.Config().BaseURL, "/")
-	if !strings.HasSuffix(baseURL, "/v1") {
-		baseURL = baseURL + "/v1"
-	}
-	url := fmt.Sprintf("%s/chat/completions", baseURL)
+	url := chatCompletionsURL(c.Config().BaseURL)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(jsonData))
 	if err != nil {
