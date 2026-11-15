@@ -2,6 +2,8 @@ module github.com/DotNetAge/gochat
 
 go 1.24.4
 
+toolchain go1.26.11
+
 require github.com/stretchr/testify v1.11.1
 
 require (
