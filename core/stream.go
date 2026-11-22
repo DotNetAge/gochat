@@ -312,11 +312,12 @@ func (s *Stream) drainTail() bool {
 				s.current = ev
 				return true
 			}
-			// 纯 usage 帧（choices 为空）只更新 usage；其余事件更新 current。
-			if ev.Usage == nil && ev.Type != EventDone {
-				s.current = ev
-				return true
-			}
+			// current 保存的是 finish_reason 帧，消费方（例如循环结束后调用
+			// Event() 读 FinishReason）依赖它。finish_reason 之后到达的任何事件
+			// 都不得覆盖 current——不只是纯 usage 帧：某些服务端还会补发
+			// content 帧或额外的 EventDone。覆盖会让 FinishReason 变成空串，
+			// 进而破坏 goagent 对 stop / tool_calls 的判断。
+			// 故这里只采集 usage，不写 current。
 		case <-timer.C:
 			return false
 		}

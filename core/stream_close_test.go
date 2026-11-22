@@ -30,6 +30,45 @@ func (b *probeBody) Close() error {
 	return nil
 }
 
+// TestStream_TailNeverClobbersFinishReason 锁定：finish_reason 之后到达的
+// **任何**事件都不得覆盖 current。
+//
+// 不只是纯 usage 帧——某些服务端在 [DONE] 前还会补发 content 帧或重复的
+// EventDone。一旦覆盖，FinishReason 会变成空串，goagent 依据它判断
+// stop / tool_calls 的逻辑随之失效。
+func TestStream_TailNeverClobbersFinishReason(t *testing.T) {
+	cases := []struct {
+		name  string
+		trail []StreamEvent
+	}{
+		{"trailing usage", []StreamEvent{{Type: EventDone, Usage: &Usage{TotalTokens: 9}}}},
+		{"trailing content", []StreamEvent{{Type: EventContent, Content: "late"}}},
+		{"trailing extra done", []StreamEvent{{Type: EventDone, FinishReason: ""}}},
+		{"mixed", []StreamEvent{
+			{Type: EventContent, Content: "late"},
+			{Type: EventDone, Usage: &Usage{TotalTokens: 9}},
+		}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ch := make(chan StreamEvent, len(c.trail)+1)
+			ch <- StreamEvent{Type: EventDone, FinishReason: "tool_calls"}
+			for _, ev := range c.trail {
+				ch <- ev
+			}
+			close(ch)
+
+			s := NewStream(ch, nil)
+			for s.Next() {
+			}
+
+			if got := s.Event().FinishReason; got != "tool_calls" {
+				t.Fatalf("FinishReason 被尾部事件覆盖，got %q", got)
+			}
+		})
+	}
+}
+
 // TestClose_ReleasesProducerBeforeDraining 锁定 Close() 的顺序约束：
 // 必须先关 body（解除生产者的 Read 阻塞），再排空通道。
 //
