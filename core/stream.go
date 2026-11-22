@@ -123,6 +123,12 @@ type Stream struct {
 	// tailWait 是收到 EventDone 后等待尾部 usage 帧的上限，零值取 defaultTailWait。
 	tailWait time.Duration
 
+	// tailDeadline 是尾部 drain 的绝对截止时刻。首次进入 drainTail 时设定，
+	// 之后所有 drainTail 调用共用同一个截止时刻，确保总等待严格不超过 tailWait。
+	// 若用「每次调用新建 timer」，则每收到一个尾部非 usage 事件就会重新计满一轮，
+	// 总等待可被无限拉长——与 tailWait 的语义不符。
+	tailDeadline time.Time
+
 	// Tool call accumulation state
 	toolCallAcc map[int]*streamToolCallState // accumulation state by delta index
 	toolCalls   []ToolCall                   // final accumulated tool calls
@@ -278,12 +284,19 @@ func (s *Stream) Next() bool {
 //
 // 返回 false 表示尾部已耗尽（生产者关闭通道）。等待上限由 tailWait 控制，
 // 避免对端在 finish_reason 之后既不发送 [DONE] 也不关闭连接时无限阻塞。
+//
+// 上限是「从首次进入 drainTail 起算的总时长」，不是每次调用各自计时：
+// tailDeadline 在首次进入时固定，此后每次调用都复用它。否则尾部若夹带多个
+// 非 usage 事件，每返回一次就重置一次 timer，总等待会被无限拉长。
 func (s *Stream) drainTail() bool {
-	wait := s.tailWait
-	if wait <= 0 {
-		wait = defaultTailWait
+	if s.tailDeadline.IsZero() {
+		wait := s.tailWait
+		if wait <= 0 {
+			wait = defaultTailWait
+		}
+		s.tailDeadline = time.Now().Add(wait)
 	}
-	timer := time.NewTimer(wait)
+	timer := time.NewTimer(time.Until(s.tailDeadline))
 	defer timer.Stop()
 	for {
 		select {
@@ -332,9 +345,14 @@ func (s *Stream) Event() StreamEvent {
 // Close releases resources associated with the stream. It is safe to call
 // multiple times. After Close is called, Next will always return false.
 //
-// Close will wait up to 5 seconds for the event channel to drain.
-// If the producer goroutine has exited without closing the channel,
-// Close will return after the timeout rather than blocking forever.
+// 顺序很重要：先关 closer（HTTP body）再排空通道。
+// 生产者 goroutine 通常阻塞在 resp.Body.Read 上；只有关闭 body 才能让它读到
+// EOF/错误并退出、进而关闭通道。若反过来先 drain 通道再关 body，drain 必然
+// 等满 streamCloseTimeout（因为唤醒生产者的动作被排在它后面）。
+// 先关 body 后，生产者立即解除阻塞并关通道，drain 通常在一轮内结束。
+//
+// 排空仍保留，是为了让生产者把已写入的尾部事件送达、避免 goroutine 泄漏；
+// 有 streamCloseTimeout 兜底，不会永久阻塞。
 //
 // Returns an error if closing the underlying closer fails
 func (s *Stream) Close() error {
@@ -354,6 +372,12 @@ func (s *Stream) Close() error {
 	// Clear finalizer since we're closing manually
 	runtime.SetFinalizer(s, nil)
 
+	// 先释放生产者：它多半正卡在读 body 上，不关 body 就不会退出。
+	var closeErr error
+	if s.closer != nil {
+		closeErr = s.closer.Close()
+	}
+
 	timer := time.NewTimer(streamCloseTimeout)
 	defer timer.Stop()
 
@@ -361,18 +385,12 @@ func (s *Stream) Close() error {
 		select {
 		case _, ok := <-s.ch:
 			if !ok {
-				goto closeCloser
+				return closeErr
 			}
 		case <-timer.C:
-			goto closeCloser
+			return closeErr
 		}
 	}
-
-closeCloser:
-	if s.closer != nil {
-		return s.closer.Close()
-	}
-	return nil
 }
 
 // Err returns any error that occurred during streaming.
