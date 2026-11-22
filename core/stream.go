@@ -25,6 +25,11 @@ type ToolCallDelta struct {
 // stream channel to drain before giving up.
 const streamCloseTimeout = 5 * time.Second
 
+// defaultTailWait 是收到 finish_reason 之后等待尾部 usage 帧的上限。
+// 需覆盖正常网络尾包延迟（毫秒级），又不能让「对端既不发 [DONE] 也不关连接」
+// 的情形明显拖慢收尾。
+const defaultTailWait = 500 * time.Millisecond
+
 // StreamEventType classifies the type of event received during streaming.
 type StreamEventType string
 
@@ -115,6 +120,9 @@ type Stream struct {
 	doneCh  chan struct{}
 	once    sync.Once
 
+	// tailWait 是收到 EventDone 后等待尾部 usage 帧的上限，零值取 defaultTailWait。
+	tailWait time.Duration
+
 	// Tool call accumulation state
 	toolCallAcc map[int]*streamToolCallState // accumulation state by delta index
 	toolCalls   []ToolCall                   // final accumulated tool calls
@@ -131,9 +139,10 @@ type Stream struct {
 // Returns a new Stream instance
 func NewStream(ch <-chan StreamEvent, closer io.Closer) *Stream {
 	s := &Stream{
-		ch:     ch,
-		closer: closer,
-		doneCh: make(chan struct{}),
+		ch:       ch,
+		closer:   closer,
+		doneCh:   make(chan struct{}),
+		tailWait: defaultTailWait,
 	}
 	if closer != nil {
 		runtime.SetFinalizer(s, func(obj *Stream) {
@@ -216,19 +225,7 @@ func (s *Stream) Next() bool {
 	// After done, still drain remaining channel events to catch
 	// trailing usage-only chunks sent after finish_reason.
 	if s.done || s.closed {
-		select {
-		case ev, ok := <-s.ch:
-			if !ok {
-				return false
-			}
-			s.current = ev
-			if ev.Usage != nil {
-				s.usage = ev.Usage
-			}
-			return true
-		default:
-			return false
-		}
+		return s.drainTail()
 	}
 	select {
 	case <-s.doneCh:
@@ -263,9 +260,53 @@ func (s *Stream) Next() bool {
 				s.current = ev
 			}
 			s.done = true
-			s.closeInternal()
+			// 不在此处关闭 body：finish_reason 之后通常还有 trailing usage 帧和
+			// data: [DONE]，生产者 goroutine 此时仍阻塞在读 body 上。提前 Close 会让
+			// 它读到 "http2: response body closed" 并被透传成 EventError，把正常的
+			// 流式收尾误报成网络断流。body 由生产者的 defer 负责关闭。
 		}
 		return true
+	}
+}
+
+// drainTail 在已收到 EventDone 之后继续从通道取事件，用于捕获 include_usage=true
+// 时在 finish_reason 之后单独发送的 usage 帧。
+//
+// 关键约束：纯 usage 帧不覆盖 s.current。current 保存的是 finish_reason 帧，消费方
+// （例如在循环结束后调用 Event() 读取 FinishReason）依赖它；若被后续 usage 帧覆盖，
+// FinishReason 会变成空串。
+//
+// 返回 false 表示尾部已耗尽（生产者关闭通道）。等待上限由 tailWait 控制，
+// 避免对端在 finish_reason 之后既不发送 [DONE] 也不关闭连接时无限阻塞。
+func (s *Stream) drainTail() bool {
+	wait := s.tailWait
+	if wait <= 0 {
+		wait = defaultTailWait
+	}
+	timer := time.NewTimer(wait)
+	defer timer.Stop()
+	for {
+		select {
+		case ev, ok := <-s.ch:
+			if !ok {
+				return false
+			}
+			if ev.Usage != nil {
+				s.usage = ev.Usage
+			}
+			// 生产者报错必须冒泡，不能被尾部 drain 吞掉。
+			if ev.Err != nil {
+				s.current = ev
+				return true
+			}
+			// 纯 usage 帧（choices 为空）只更新 usage；其余事件更新 current。
+			if ev.Usage == nil && ev.Type != EventDone {
+				s.current = ev
+				return true
+			}
+		case <-timer.C:
+			return false
+		}
 	}
 }
 
