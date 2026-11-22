@@ -144,3 +144,80 @@ func TestStream_TailWait_IsTotalBudget(t *testing.T) {
 		t.Fatalf("尾部 drain 只用了 %s，没有真正等待 tailWait 预算", elapsed)
 	}
 }
+
+// TestFinalizeToolCalls_IndexBounds 锁定 index 的上下界处理：
+//
+//   - 负数 index 应被跳过（修复前 maxIdx 从 0 起，负条目永不入结果）；
+//   - 远超合理范围的 index 不得触发巨额预分配。修复前按 [0, maxIdx] 逐槽
+//     遍历，index=50_000_000 时会 make 出 5000 万个槽位（数 GB 内存）。
+//
+// 正常工具调用的 index 是 0 起的连续小整数。
+func TestFinalizeToolCalls_IndexBounds(t *testing.T) {
+	t.Run("negative index skipped", func(t *testing.T) {
+		ch := make(chan StreamEvent, 3)
+		ch <- StreamEvent{Type: EventToolCall, ToolCallDeltas: []ToolCallDelta{
+			{Index: -1, ID: "neg", Name: "bad"},
+			{Index: 0, ID: "ok", Name: "good", Arguments: `{}`},
+		}}
+		ch <- StreamEvent{Type: EventDone, FinishReason: "tool_calls"}
+		close(ch)
+
+		s := NewStream(ch, nil)
+		for s.Next() {
+		}
+		calls := s.ToolCalls()
+		if len(calls) != 1 || calls[0].ID != "ok" {
+			t.Fatalf("应只保留 index=0 的调用，got %+v", calls)
+		}
+	})
+
+	t.Run("huge index bounded", func(t *testing.T) {
+		ch := make(chan StreamEvent, 3)
+		ch <- StreamEvent{Type: EventToolCall, ToolCallDeltas: []ToolCallDelta{
+			{Index: 50_000_000, ID: "huge", Name: "bad"},
+			{Index: 1, ID: "ok2", Name: "good2", Arguments: `{}`},
+		}}
+		ch <- StreamEvent{Type: EventDone, FinishReason: "tool_calls"}
+		close(ch)
+
+		start := time.Now()
+		s := NewStream(ch, nil)
+		for s.Next() {
+		}
+		elapsed := time.Since(start)
+
+		calls := s.ToolCalls()
+		if len(calls) != 1 || calls[0].ID != "ok2" {
+			t.Fatalf("超大 index 应被丢弃，只留 index=1，got %+v", calls)
+		}
+		// 修复前这里要分配 5000 万槽位，耗时数百毫秒。
+		if elapsed > 50*time.Millisecond {
+			t.Fatalf("超大 index 处理耗时 %s，疑似仍按 maxIdx 预分配", elapsed)
+		}
+	})
+
+	t.Run("normal order preserved", func(t *testing.T) {
+		ch := make(chan StreamEvent, 5)
+		ch <- StreamEvent{Type: EventToolCall, ToolCallDeltas: []ToolCallDelta{
+			{Index: 2, ID: "c", Name: "third"},
+			{Index: 0, ID: "a", Name: "first"},
+			{Index: 1, ID: "b", Name: "second"},
+		}}
+		ch <- StreamEvent{Type: EventDone, FinishReason: "tool_calls"}
+		close(ch)
+
+		s := NewStream(ch, nil)
+		for s.Next() {
+		}
+		calls := s.ToolCalls()
+		if len(calls) != 3 {
+			t.Fatalf("期望 3 个调用，got %d", len(calls))
+		}
+		want := []string{"a", "b", "c"}
+		for i, w := range want {
+			if calls[i].ID != w {
+				t.Fatalf("顺序错误：位置 %d 期望 %s，got %s", i, w, calls[i].ID)
+			}
+		}
+	})
+}

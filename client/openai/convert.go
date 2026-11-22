@@ -211,6 +211,15 @@ func usageFromWire(wire *Usage) *core.Usage {
 	return u
 }
 
+// sseMaxLineBytes 是单行 SSE 的上限。
+//
+// bufio.Scanner 默认上限只有 64KB，超限会返回 bufio.ErrTooLong，导致整条流
+// 以 token too long 断掉。OpenAI 兼容服务的正常帧通常只有几百字节（实测
+// dashscope + deepseek-v4.1-flash-1017：784 帧，最大单帧 387 字节），但
+// 非增量返回的 provider、或带 base64 图片回显、大 tool_call arguments 的
+// 响应都可能出现单帧数 MB 的情况。这里给到 4MB，兼顾内存与兼容性。
+const sseMaxLineBytes = 4 << 20
+
 // ParseSSEStream parses Server-Sent Events stream and returns a channel of StreamChunks
 func ParseSSEStream(reader io.Reader) <-chan StreamChunk {
 	ch := make(chan StreamChunk, 10)
@@ -219,17 +228,23 @@ func ParseSSEStream(reader io.Reader) <-chan StreamChunk {
 		defer close(ch)
 
 		scanner := bufio.NewScanner(reader)
+		// 提高单行上限，避免大帧把整条流打断。
+		scanner.Buffer(make([]byte, 0, 64*1024), sseMaxLineBytes)
 		for scanner.Scan() {
 			line := scanner.Text()
 			if line == "" {
 				continue
 			}
 
-			if !strings.HasPrefix(line, "data: ") {
+			// SSE 规范（WHATWG）允许 "data:" 后省略前导空格，
+			// 因此先做前缀判断，再按需剥掉一个空格。
+			if !strings.HasPrefix(line, "data:") {
 				continue
 			}
 
-			data := strings.TrimPrefix(line, "data: ")
+			data := strings.TrimPrefix(line, "data:")
+			data = strings.TrimPrefix(data, " ")
+
 			if data == "[DONE]" {
 				return
 			}

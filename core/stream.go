@@ -3,6 +3,7 @@ package core
 import (
 	"io"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -187,26 +188,37 @@ func (s *Stream) accumulateToolCalls(deltas []ToolCallDelta) {
 	}
 }
 
+// maxStreamToolCallIndex 是工具调用 index 的合理上限。
+//
+// finalizeToolCalls 按服务端给出的 index 直接预分配结果切片，而 index 完全
+// 来自响应帧。若响应被污染或恶意构造（例如 index=50_000_000），
+// make([]ToolCall, 0, maxIdx+1) 会一次性申请数 GB 内存。
+// 正常工具调用的 index 是 0 起的连续小整数，几十已属异常。
+const maxStreamToolCallIndex = 256
+
 // finalizeToolCalls converts the accumulated tool call states into final
 // ToolCall slices. This is called when the stream ends (EventDone).
+//
+// 结果按 index 升序输出，且只包含实际收到的 index——不再按 [0, maxIdx]
+// 逐槽遍历，避免「稀疏但上限很大」的 index 触发巨额预分配。
 func (s *Stream) finalizeToolCalls() {
 	if len(s.toolCallAcc) == 0 {
 		s.toolCalls = nil
 		return
 	}
-	// Collect by index order for deterministic output
-	maxIdx := 0
+
+	idxs := make([]int, 0, len(s.toolCallAcc))
 	for idx := range s.toolCallAcc {
-		if idx > maxIdx {
-			maxIdx = idx
-		}
-	}
-	result := make([]ToolCall, 0, maxIdx+1)
-	for i := 0; i <= maxIdx; i++ {
-		state, ok := s.toolCallAcc[i]
-		if !ok {
+		if idx < 0 || idx > maxStreamToolCallIndex {
 			continue
 		}
+		idxs = append(idxs, idx)
+	}
+	sort.Ints(idxs)
+
+	result := make([]ToolCall, 0, len(idxs))
+	for _, i := range idxs {
+		state := s.toolCallAcc[i]
 		result = append(result, ToolCall{
 			ID:        state.id,
 			Name:      state.name,
