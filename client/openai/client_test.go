@@ -19,7 +19,7 @@ func TestClient_Chat(t *testing.T) {
 
 	client, err := NewOpenAI(core.Config{
 		APIKey: apiKey,
-		Model:  "qwen3.5-flash",
+		Model:  "deepseek-v4.1-flash-1017",
 	})
 	require.NoError(t, err)
 
@@ -40,7 +40,7 @@ func TestClient_ChatStream(t *testing.T) {
 
 	client, err := NewOpenAI(core.Config{
 		APIKey: apiKey,
-		Model:  "qwen3.5-flash",
+		Model:  "deepseek-v4.1-flash-1017",
 	})
 	require.NoError(t, err)
 
@@ -74,7 +74,7 @@ func TestClient_ChatStreamWithThinking(t *testing.T) {
 
 	client, err := NewOpenAI(core.Config{
 		APIKey: apiKey,
-		Model:  "qwen3.5-flash",
+		Model:  "deepseek-v4.1-flash-1017",
 	})
 	require.NoError(t, err)
 
@@ -131,7 +131,7 @@ func TestClient_ChatWithOptions(t *testing.T) {
 
 	client, err := NewOpenAI(core.Config{
 		APIKey: apiKey,
-		Model:  "qwen3.5-flash",
+		Model:  "deepseek-v4.1-flash-1017",
 	})
 	require.NoError(t, err)
 
@@ -168,7 +168,7 @@ func TestClient_ChatWithAttachments(t *testing.T) {
 
 	client, err := NewOpenAI(core.Config{
 		APIKey: apiKey,
-		Model:  "qwen3.5-flash",
+		Model:  "deepseek-v4.1-flash-1017",
 	})
 	require.NoError(t, err)
 
@@ -201,7 +201,7 @@ func TestClient_ToolCalling(t *testing.T) {
 
 	client, err := NewOpenAI(core.Config{
 		APIKey: apiKey,
-		Model:  "qwen3.5-flash",
+		Model:  "deepseek-v4.1-flash-1017",
 	})
 	require.NoError(t, err)
 
@@ -250,7 +250,7 @@ func TestClient_ToolCallingWithResult(t *testing.T) {
 
 	client, err := NewOpenAI(core.Config{
 		APIKey: apiKey,
-		Model:  "qwen3.5-flash",
+		Model:  "deepseek-v4.1-flash-1017",
 	})
 	require.NoError(t, err)
 
