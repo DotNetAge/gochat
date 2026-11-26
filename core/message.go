@@ -90,6 +90,16 @@ type Message struct {
 	ToolCalls        []ToolCall     `json:"tool_calls,omitempty"`    // assistant requesting tool use
 	ToolCallID       string         `json:"tool_call_id,omitempty"`  // for role=tool responses
 	ReasoningContent string         `json:"reasoning_content,omitempty"` // thinking/reasoning stream (DeepSeek-R1 etc.)
+
+	// Origin 标记这条消息的真实来源：空值表示用户或模型的正常发言，
+	// "tool_vision" 表示工具读取的图片以视觉附件形式注入，"task_board_nudge"
+	// 表示宿主机追加的任务板提醒。
+	//
+	// 这类消息在协议上只能以 user 角色出现在对话中间（多模态内容必须挂 user
+	// 消息，且 OpenAI 兼容层只允许 messages[0] 为 system）。来源标记让宿主、
+	// 会话存储与前端能区分「谁在说话」，而不必依赖正文里的固定前缀。
+	// json:"-" 使其永不进入线上请求体：各 provider 转换层按字段白名单投影。
+	Origin string `json:"-"`
 }
 
 // NewTextMessage creates a message with text content
